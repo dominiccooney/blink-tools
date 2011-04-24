@@ -1,13 +1,26 @@
-;; TODO: don't hard-code WebKitBuild folder
-;; TODO: characterize results as [D]ebug or [R]elease
-;; TODO: color the results buffer instead of using ugly underlined buttons
-;; TODO: q should close the results buffer
+;; Copyright 2011 Dominic Cooney. All Rights Reserved.
+;;
+;; This has two useful functions for working with WebKit in emacs:
+;;
+;; wk-find-binding-files finds files related to JavaScript bindings
+;; for the current buffer; for example, when visiting Node.h if you
+;; M-x wk-find-binding-files it will search your source tree and
+;; present you with a menu including Node.cpp, Node.idl, JSC and V8
+;; custom bindings and JSC and V8 generated bindings (if they exist in
+;; your build output.)
+;;
+;; wk-refresh-files is for getting your open buffers to a good state
+;; after a git rebase. It looks at all of your open buffers and, if
+;; they haven't been edited, updates them to the latest on-disk
+;; versions; if they have been edited wk-refresh-files will prompt you
+;; to revert them or not (or you can use C-g to bail out at this
+;; unhappy juncture to save them and use git diff to clean up.)
 
 (defun wk-characterize-path (file-name)
   "Characterizes a file path as JS for JSC, V8, or WC for WebCore."
   (catch 'return
     (let ((patterns '(("/Source/WebCore/bindings/js/" . "JS")
-                      ("/WebKitBuild/DerivedSources/WebCore/" . "JS")
+                      ("/WebKitBuild/\\(Debug\\|Release\\)/DerivedSources/WebCore/" . "JS")
                       ("/Source/WebCore/bindings/v8/" . "V8")
                       ("/Source/WebKit/chromium/" . "V8")
                       ("/Source/WebCore/" . "WC"))))
@@ -23,7 +36,7 @@
                    (concat root "/Source/WebCore/*/" base-name ".*")
                    (concat root "/Source/WebCore/*/*/" base-name ".*")
                    ;; JSC generated bindings
-                   (concat root "/WebKitBuild/DerivedSources/WebCore/JS"
+                   (concat root "/WebKitBuild/*/DerivedSources/WebCore/JS"
                            base-name ".*")
                    ;; JSC custom code
                    (concat root "/Source/WebCore/bindings/js/JSCustom"
@@ -85,7 +98,7 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the WebKit folder."
   (catch 'return
     (let ((patterns '(
             ;; JSC derived sources
-            ("\\(.*\\)/WebKitBuild/\\(Debug\\|Release\\)DerivedSources/WebCore/JS\\(.*\\)\\..*$"
+            ("\\(.*\\)/WebKitBuild/\\(Debug\\|Release\\)/DerivedSources/WebCore/JS\\(.*\\)\\..*$"
              . ((root . 1) (base-name . 3)))
             ;; Chromium derived sources
             ("\\(.*\\)/Source/WebKit/chromium/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webcore/bindings/V8\\(.*\\)\\.cpp$"
@@ -119,4 +132,26 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the WebKit folder."
                               (wk-binding-alternatives (car root-base-name) (cdr root-base-name)))
       (message "JavaScript binding files not found"))))
 
+(defun wk-refresh-files ()
+  "Refreshes buffers, useful after a git rebase."
+  (interactive)
+  (save-excursion
+    (dolist (buffer (buffer-list))
+      (set-buffer buffer)
+      (let ((saved-point (point))
+            (file-name (buffer-file-name)))
+        (when (not (verify-visited-file-modtime (current-buffer)))
+          (if (buffer-modified-p)
+              (switch-to-buffer buffer))
+          (revert-buffer t (not (buffer-modified-p)) t)
+          (goto-char saved-point))))))
+
 ;; (setq edebug-all-defs nil)
+
+(provide 'webkit-stuff)
+
+;; TODO: don't hard-code WebKitBuildDir
+;; TODO: don't assume WebKit build dir is under source tree root
+;; TODO: characterize results as [D]ebug or [R]elease
+;; TODO: color the results buffer instead of using ugly underlined buttons
+;; TODO: q should close the results buffer
