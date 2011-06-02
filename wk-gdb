@@ -11,6 +11,9 @@ define wk_show_JSCell
 
   print $arg0
 end
+document wk_show_JSCell
+dump a JSCell
+end
 
 define wk_show_ConservativeRoots
   printf "ConservativeRoots has %d roots\n", $arg0.size()
