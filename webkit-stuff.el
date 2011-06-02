@@ -15,6 +15,42 @@
 ;; versions; if they have been edited wk-refresh-files will prompt you
 ;; to revert them or not (or you can use C-g to bail out at this
 ;; unhappy juncture to save them and use git diff to clean up.)
+;;
+;; This also has some mode hooks and font tweaks for highlighting
+;; tabs. To install the hooks, run:
+;;
+;;    (wk-setup)
+
+(defun wk-setup ()
+  "Sets up various hooks and fonts for WebKit development."
+  (interactive)
+
+  (add-hook 'c++-mode-hook 'wk-prog-mode-hook)
+  (add-hook 'change-log-mode-hook 'wk-change-log-mode-hook)
+
+  (setq auto-mode-alist
+        (append (list '("\\.mm\\'" . objc-mode)
+                      '("\\.h\\'" . c++-mode))
+                auto-mode-alist))
+
+  (defface wk-tab-face
+    '((t (:background "Red"))) "Tab" :group 'font-lock-faces)
+  (font-lock-add-keywords 'c++-mode
+                          '(("\\(\t+\\)" 1 'wk-tab-face)))
+  (font-lock-add-keywords 'change-log-mode
+                          '(("\\(\t+\\)" 1 'wk-tab-face))))
+
+(defun wk-prog-mode-hook ()
+  (if (and (string-match "WebKit" (buffer-file-name)))
+      (progn
+       (set-variable 'indent-tabs-mode nil)
+       (set-variable 'c-basic-offset 4))))
+
+(defun wk-change-log-mode-hook ()
+  (if (string-match "WebKit" (buffer-file-name))
+      (let ()
+        (set-variable 'indent-tabs-mode nil)
+        (flyspell-mode))))
 
 (defun wk-characterize-path (file-name)
   "Characterizes a file path as JS for JSC, V8, or WC for WebCore."
