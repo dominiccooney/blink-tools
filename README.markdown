@@ -10,6 +10,9 @@ development](http://www.webkit.org/coding/contributing.html):
    Python,](http://sourceware.org/gdb/current/onlinedocs/gdb/Python.html)
    but WebKit development uses toolchains with ancient versions of gdb
    that don't support Python scripting.
+ * [drt-bisect.sh](webkit-tools/blob/master/drt-bisect.sh) is a driver
+   for git-bisect that builds and runs DRT to test whether a revision
+   is 'good'.
  * [init-env.sh](webkit-tools/blob/master/init-env.sh) configures git
    with WebKit's ChangeLog creating and merging tools. Edit the
    `REAL_NAME` and `EMAIL` variables in the script before running it.
