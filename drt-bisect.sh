@@ -54,10 +54,10 @@ if [ -z "${script_dir}" ]; then
 fi
 
 # Guess where built products go
-if [[ "$(pwd)" =~ '^/Volumes/' ]]; then
-  build_dir=WebKitBuild/Release
+if [[ "$(pwd)" =~ '/Volumes/' ]]; then
+  build_dir=WebKitBuild
 else
-  build_dir=~/bin/Release
+  build_dir=~/bin
 fi
 
 ${script_dir}/build-webkit --release --clean || exit 125
@@ -67,7 +67,7 @@ ${script_dir}/build-dumprendertree --release || exit 125
 
 for test in $tests
 do
-  out=$("${build_dir}/DumpRenderTree" "$test" 2>&1)
+  out=$("${build_dir}/Release/DumpRenderTree" "$test" 2>&1)
   echo $out
   if [[ "$out" =~ "FAIL" || ! "$out" =~ "PASS" ]]; then
     echo 'bad'
