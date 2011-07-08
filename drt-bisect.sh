@@ -1,34 +1,79 @@
 #!/bin/bash
 
 # Does a clean release build of WebKit and runs DumpRenderTree,
-# grepping the output for PASS. If PASS is output, then the revision
-# is "good." If not, the revision is "bad". If the build fails or
-# DumpRenderTree fails to run, the revision is skipped.
+# checking the output to see if the revision is good or not.
+#
+# If the build fails, the revision is skipped.
+#
+# If the build is OK, drt-bisect scans the output for FAIL; if it
+# finds FAIL it marks the revision as "bad". If there is no FAIL and
+# the output contains PASS then it marks the revision as
+# "good". Finally, if the output contains neither PASS nor FAIL then
+# it marks the revision as bad.
 #
 # Usage:
 #
 # git bisect start known_bad known_good
-# EXPORT TEST=/full/path/to/test
-# git bisect run ~/webkit-tools/drt-bisect.sh
+# git bisect run ~/webkit-tools/drt-bisect.sh /full/path/to/test1 ...
 
-if [[ -z "$TEST" || ! -a "$TEST" ]]; then
-  echo '$TEST should point to a file to run in DRT'
+# TODO: make it work on Linux, Windows; other ports
+# TODO: make it find build output intelligently
+
+tests=$*
+
+# Must specify some tests
+if [ -z "$tests" ]; then
+  echo "usage: $0 /full/path/to/test1 /full/path/to/test2 ..."
   exit 128
 fi
 
-# Tools/Scripts/build-webkit --release --clean || exit 125
-xcodebuild -project WebKit/WebKit.xcodeproj -configuration Release clean || exit 125
-rm -rf ~/bin/Release/* || exit 125
-xcodebuild -project WebKit/WebKit.xcodeproj -configuration Release -target WebKit || exit 125
-xcodebuild -project WebKitTools/DumpRenderTree/DumpRenderTree.xcodeproj -configuration Release -target DumpRenderTree || exit 125
-# Tools/Scripts/build-webkit --release || exit 125
-# Tools/Scripts/build-dumprendertree --release || exit 125
-out=$(~/bin/Release/DumpRenderTree $TEST 2>&1)
-echo $out
-if [[ "$out" =~ "PASS" ]]; then
-  echo 'good'
-  exit 0
+# Check the tests exist up-front, otherwise git bisect wastes a lot of
+# time building for nothing.
+for test in $tests
+do
+  if [[ ! -a "$test" ]]; then
+    echo "not found: $test"
+    exit 128
+  fi
+done
+
+# The location of build-webkit depends on the era of the revision
+script_dir=
+script_dir_candidates="Tools/Scripts WebKitTools/Scripts"
+for script_dir_candidate in $script_dir_candidates
+do
+  if [ -a "${script_dir_candidate}/build-webkit" ]; then
+    script_dir=$script_dir_candidate
+  fi
+done
+
+if [ -z "${script_dir}" ]; then
+  echo 'could not find build-webkit and friends'
+  echo '(are you running from root of WebKit tree?)'
+  exit 128
 fi
 
-echo 'bad'
-exit 1
+# Guess where built products go
+if [[ "$(pwd)" =~ '^/Volumes/' ]]; then
+  build_dir=WebKitBuild/Release
+else
+  build_dir=~/bin/Release
+fi
+
+${script_dir}/build-webkit --release --clean || exit 125
+rm -rf "${build_dir}/*" || exit 125
+${script_dir}/build-webkit --release || exit 125
+${script_dir}/build-dumprendertree --release || exit 125
+
+for test in $tests
+do
+  out=$("${build_dir}/DumpRenderTree" "$test" 2>&1)
+  echo $out
+  if [[ "$out" =~ "FAIL" || ! "$out" =~ "PASS" ]]; then
+    echo 'bad'
+    exit 1
+  fi
+done
+
+echo 'good'
+exit 0
