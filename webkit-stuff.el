@@ -1,4 +1,4 @@
-;; Copyright 2011 Dominic Cooney. All Rights Reserved.
+
 ;;
 ;; This has two useful functions for working with WebKit in emacs:
 ;;
@@ -59,6 +59,8 @@
                       ("/WebKitBuild/\\(Debug\\|Release\\)/DerivedSources/WebCore/" . "JS")
                       ("/Source/WebCore/bindings/v8/" . "V8")
                       ("/Source/WebKit/chromium/" . "V8")
+                      ("/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webcore/bindings/" . "V8")
+                      ("/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webkit/bindings/" . "V8")
                       ("/Source/WebCore/" . "WC"))))
       (dolist (pattern patterns)
         (when (string-match (car pattern) file-name)
@@ -86,6 +88,11 @@
                    (concat root "/Source/WebKit/chromium/xcodebuild"
                            "/DerivedSources/*/webkit/bindings/V8"
                            base-name ".h")
+                   ;; V8 generated bindings in Chromium build
+                   (concat root "/../../xcodebuild/DerivedSources/*/webcore"
+                           "/bindings/V8" base-name ".cpp")
+                   (concat root "/../../xcodebuild/DerivedSources/*/webkit"
+                           "/bindings/V8" base-name ".h")
                    ;; V8 custom code
                    (concat root "/Source/WebCore/bindings/v8/custom/V8Custom"
                            base-name ".*")
@@ -141,6 +148,10 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the WebKit folder."
              . ((root . 1) (base-name . 3)))
             ("\\(.*\\)/Source/WebKit/chromium/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webkit/bindings/V8\\(.*\\)\\.h$"
              . ((root . 1) (base-name . 3)))
+            ("\\(.*\\)/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webcore/bindings/V8\\(.*\\)\\.cpp$"
+             . ((root . (1 "/third_party/WebKit")) (base-name . 3)))
+            ("\\(.*\\)/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webkit/bindings/V8\\(.*\\)\\.h$"
+             . ((root . (1 "/third_party/WebKit")) (base-name . 3)))
             ;; JSC custom bindings
             ("\\(.*\\)/Source/WebCore/bindings/js/JSCustom\\(.*\\)\\..*"
              . ((root . 1) (base-name . 2)))
@@ -154,10 +165,20 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the WebKit folder."
             ;; WebCore types and IDLs
             ("\\(.*\\)/Source/WebCore/\\([a-z/]*\\)/\\([A-Z].*\\)\\.\\(.*\\)$"
              . ((root . 1) (base-name . 3))))))
-      (dolist (pattern patterns)
-        (when (string-match (car pattern) file)
-          (throw 'return (cons (match-string (cdr (assoc 'root (cdr pattern))) file)
-                               (match-string (cdr (assoc 'base-name (cdr pattern))) file))))))))
+      (let* ((mk-path
+	      (lambda (pat)
+		(cond
+		 ((listp pat)
+		  (apply #'concat (mapcar mk-path pat)))
+		 ((numberp pat)
+		  (match-string pat file))
+		 ((stringp pat)
+		  pat)
+		 (t (error "invalid pattern: %s" pat))))))
+        (dolist (pattern patterns)
+          (when (string-match (car pattern) file)
+            (throw 'return (cons (funcall mk-path (cdr (assoc 'root (cdr pattern))))
+                                 (funcall mk-path (cdr (assoc 'base-name (cdr pattern))))))))))))
 
 (defun wk-find-binding-files ()
   "Finds JavaScript binding files related to the current buffer."
@@ -187,7 +208,7 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the WebKit folder."
 (provide 'webkit-stuff)
 
 ;; TODO: don't hard-code WebKitBuildDir
-;; TODO: don't assume WebKit build dir is under source tree root
+;; TODO: support WebKit build dir in ~/bin
 ;; TODO: characterize results as [D]ebug or [R]elease
 ;; TODO: color the results buffer instead of using ugly underlined buttons
 ;; TODO: q should close the results buffer
