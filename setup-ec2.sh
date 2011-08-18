@@ -5,7 +5,7 @@ set -o nounset
 
 cd ~
 
-sudo apt-add-repository ppa:martin-james-robinson/webkitgtk
+# sudo apt-add-repository ppa:martin-james-robinson/webkitgtk
 
 # Pull down Chromium
 if [ ! -d chromium ]; then
