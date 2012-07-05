@@ -57,8 +57,10 @@
   (catch 'return
     (let ((patterns '(("/Source/WebCore/bindings/js/" . "JS")
                       ("/WebKitBuild/\\(Debug\\|Release\\)/DerivedSources/WebCore/" . "JS")
-                      ("/Source/WebCore/bindings/v8/" . "V8")
-                      ("/Source/WebKit/chromium/" . "V8")
+                      ("/webcore/bindings/" . "V8")
+                      ("/webkit/bindings/" . "V8")
+                      ("/bindings/v8/" . "V8")
+                      ("/WebKit/chromium/" . "V8")
                       ("/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webcore/bindings/" . "V8")
                       ("/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webkit/bindings/" . "V8")
                       ("/Source/WebCore/" . "WC"))))
@@ -81,18 +83,28 @@
                            base-name ".*")
                    (concat root "/Source/WebCore/bindings/js/JS" base-name
                            "Custom.*")
-                   ;; V8 generated bindings
+                   ;; V8 generated bindings, Xcode build
                    (concat root "/Source/WebKit/chromium/xcodebuild"
                            "/DerivedSources/*/webcore/bindings/V8"
                            base-name ".cpp")
                    (concat root "/Source/WebKit/chromium/xcodebuild"
                            "/DerivedSources/*/webkit/bindings/V8"
                            base-name ".h")
-                   ;; V8 generated bindings in Chromium build
+                   ;; V8 generated bindings, ninja build
+                   (concat root "/out/*/gen/webcore/bindings/V8" base-name
+                           ".cpp")
+                   (concat root "/out/*/gen/webkit/bindings/V8" base-name
+                           ".h")
+                   ;; V8 generated bindings, Chromium, Xcode build
                    (concat root "/../../xcodebuild/DerivedSources/*/webcore"
                            "/bindings/V8" base-name ".cpp")
                    (concat root "/../../xcodebuild/DerivedSources/*/webkit"
                            "/bindings/V8" base-name ".h")
+                   ;; V8 generated bindings, Chromium, ninja build
+                   (concat root "/../../out/*/gen/webcore/bindings/V8"
+                           base-name ".cpp")
+                   (concat root "/../../out/*/gen/webkit/bindings/V8"
+                           base-name ".h")
                    ;; V8 custom code
                    (concat root "/Source/WebCore/bindings/v8/custom/V8Custom"
                            base-name ".*")
@@ -118,6 +130,12 @@
     (shrink-window (- (window-height) (+ 2 (length files))))
     (switch-to-buffer (get-buffer-create wk-file-list-buffer))
     (erase-buffer)
+    (setq files
+          (sort files (lambda (p1 p2)
+                        (or (string< (wk-characterize-path p1)
+                                     (wk-characterize-path p2))
+                            (string< (substring p1 (length root))
+                                     (substring p2 (length root)))))))
     (dolist (file files)
       (let ((short-file-path (substring file (length root))))
         (insert (wk-characterize-path file) " ")
@@ -143,14 +161,25 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the WebKit folder."
             ;; JSC derived sources
             ("\\(.*\\)/WebKitBuild/\\(Debug\\|Release\\)/DerivedSources/WebCore/JS\\(.*\\)\\..*$"
              . ((root . 1) (base-name . 3)))
-            ;; Chromium derived sources
+            ;; V8, Xcode build
             ("\\(.*\\)/Source/WebKit/chromium/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webcore/bindings/V8\\(.*\\)\\.cpp$"
              . ((root . 1) (base-name . 3)))
             ("\\(.*\\)/Source/WebKit/chromium/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webkit/bindings/V8\\(.*\\)\\.h$"
              . ((root . 1) (base-name . 3)))
+            ;; Chromium, Xcode build
             ("\\(.*\\)/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webcore/bindings/V8\\(.*\\)\\.cpp$"
              . ((root . (1 "/third_party/WebKit")) (base-name . 3)))
             ("\\(.*\\)/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webkit/bindings/V8\\(.*\\)\\.h$"
+             . ((root . (1 "/third_party/WebKit")) (base-name . 3)))
+            ;; V8, ninja build
+            ("\\(.*/WebKit\\)/out/\\(Debug\\|Release\\)/gen/webcore/bindings/V8\\(.*\\)\\.cpp$"
+             . ((root . 1) (base-name . 3)))
+            ("\\(.*/WebKit\\)/out/\\(Debug\\|Release\\)/gen/webkit/bindings/V8\\(.*\\)\\.h$"
+             . ((root . 1) (base-name . 3)))
+            ;; Chromium, ninja build
+            ("\\(.*\\)/out/\\(Debug\\|Release\\)/webcore/bindings/V8\\(.*\\)\\.cpp$"
+             . ((root . (1 "/third_party/WebKit")) (base-name . 3)))
+            ("\\(.*\\)/out/\\(Debug\\|Release\\)/webkit/bindings/V8\\(.*\\)\\.h$"
              . ((root . (1 "/third_party/WebKit")) (base-name . 3)))
             ;; JSC custom bindings
             ("\\(.*\\)/Source/WebCore/bindings/js/JSCustom\\(.*\\)\\..*"
@@ -166,15 +195,15 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the WebKit folder."
             ("\\(.*\\)/Source/WebCore/\\([a-z/]*\\)/\\([A-Z].*\\)\\.\\(.*\\)$"
              . ((root . 1) (base-name . 3))))))
       (let* ((mk-path
-	      (lambda (pat)
-		(cond
-		 ((listp pat)
-		  (apply #'concat (mapcar mk-path pat)))
-		 ((numberp pat)
-		  (match-string pat file))
-		 ((stringp pat)
-		  pat)
-		 (t (error "invalid pattern: %s" pat))))))
+              (lambda (pat)
+                (cond
+                 ((listp pat)
+                  (apply #'concat (mapcar mk-path pat)))
+                 ((numberp pat)
+                  (match-string pat file))
+                 ((stringp pat)
+                  pat)
+                 (t (error "invalid pattern: %s" pat))))))
         (dolist (pattern patterns)
           (when (string-match (car pattern) file)
             (throw 'return (cons (funcall mk-path (cdr (assoc 'root (cdr pattern))))
