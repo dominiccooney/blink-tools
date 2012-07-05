@@ -1,4 +1,3 @@
-
 ;;
 ;; This has two useful functions for working with WebKit in emacs:
 ;;
@@ -35,6 +34,11 @@
 
   (defface wk-tab-face
     '((t (:background "Red"))) "Tab" :group 'font-lock-faces)
+
+  (defface wk-generated-file-face
+    '((t (:foreground "Black"
+          :background "color-149"))) "Generated file" :group 'font-lock-faces)
+
   (font-lock-add-keywords 'c++-mode
                           '(("\\(\t+\\)" 1 'wk-tab-face)))
   (font-lock-add-keywords 'change-log-mode
@@ -68,6 +72,25 @@
         (when (string-match (car pattern) file-name)
           (throw 'return (cdr pattern)))))
     "??"))
+
+(defun wk-is-generated-file (file-name)
+  "Returns non-NIL if the specified file is generated."
+  (catch 'return
+    (let ((patterns '(("/Source/WebCore/bindings/js/" . nil)
+                      ("/WebKitBuild/\\(Debug\\|Release\\)/DerivedSources/WebCore/" . "JS")
+                      ("/webcore/bindings/" . 't)
+                      ("/webkit/bindings/" . 't)
+                      ("/bindings/v8/custom/" . nil)
+                      ("/WebKit/chromium/" . nil)
+                      ("/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webcore/bindings/" . 't)
+                      ("/xcodebuild/DerivedSources/\\(Debug\\|Release\\)/webkit/bindings/" . 't)
+                      ("/Source/WebCore/" . nil))))
+      (let ((case-fold-search nil))
+        (dolist (pattern patterns)
+          (when (string-match (car pattern) file-name)
+            (throw 'return (cdr pattern))))))
+    nil))
+
 
 (defun wk-binding-alternatives (root base-name)
   "Gets file paths for a binding BASE-NAME in WebKit tree at ROOT."
@@ -137,14 +160,21 @@
                             (string< (substring p1 (length root))
                                      (substring p2 (length root)))))))
     (dolist (file files)
-      (let ((short-file-path (substring file (length root))))
-        (insert (wk-characterize-path file) " ")
+      (let ((short-file-path (substring file (length root)))
+            (start (point)))
+        (insert (wk-characterize-path file))
+        (if (wk-is-generated-file file)
+            (add-text-properties
+             start (point)
+             '(font-lock-face wk-generated-file-face)))
+        (insert " ")
         (insert-text-button short-file-path
                             'action #'wk-display-file-list-action
                             'button file)
         (insert "\n")))
     (goto-char (point-min))
     (forward-char 3)  ;; skip past the characterization to the path
+    (font-lock-mode 't)
     ))
 
 (defun wk-display-file-list-action (button)
