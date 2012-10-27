@@ -1,0 +1,13 @@
+{
+  "manifest_version": 2,
+  "name": "HTML5Rocks Hacks",
+  "version": "1.0",
+  "description": "Improves HTML5Rocks",
+  "content_scripts": [
+    {
+      "matches": ["http://www.html5rocks.com/*"],
+      "css": ["style.css"],
+      "js": ["script.js"]
+    }
+  ]
+}
