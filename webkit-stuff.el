@@ -53,8 +53,7 @@
 (defun wk-change-log-mode-hook ()
   (if (string-match "WebKit" (buffer-file-name))
       (let ()
-        (set-variable 'indent-tabs-mode nil)
-        (flyspell-mode))))
+        (set-variable 'indent-tabs-mode nil))))
 
 (defun wk-characterize-path (file-name)
   "Characterizes a file path as JS for JSC, V8, or WC for WebCore."
