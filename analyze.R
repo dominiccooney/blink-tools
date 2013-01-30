@@ -8,42 +8,76 @@
 # To a long data frame in this format:
 # [1] "Site"     "When"     "variable" "value"
 
-PageCyclerPerms <- function(data, f=median) {
+library('reshape')
+
+ReadPageCyclerResults <- function(filename) {
+  # Load a CSV file of results from page_cycler.
+  #
+  # To generate this format with a manual run of page cycler:
+  #  1. Run the page_cycler
+  #  2. On the results page: Select all. Copy.
+  #  3. Paste it into Google Sheets in Column B.
+  #  4. Put a repeating label (for example, a revision number) in Column A.
+  #     Multiple results can be accumulated this way in one spreadsheet.
+  #  5. File, Download As, CSV.
+  #  6. Use grep label-from-Column-A to filter out the summary data (such
+  #     as timer lag, etc.)
+  #
+  # Args:
+  #   filename: The name of the CSV file to load.
+  #
+  # Returns:
+  #   A long frame with these columns:
+  #   Site: A factor with the identifier of the page_cycler test.
+  #   When: A factor with the label from Column A.
+  #   variable: A factor with the iteration of the test, T1, T2, ...
+  #   value: The result of the iteration.
+
+  csv <- read.csv(filename, header=FALSE)
+  num.cols <- dim(csv)[2]
+  fixed.col.names <- c('When', 'Site', 'Min', 'Max', 'Mean', 'Std.d')
+  num.results <- num.cols - length(fixed.col.names)
+  result.col.names <- paste('T', 1:num.results, sep='')
+  names(csv) <- c(fixed.col.names, result.col.names)
+  return(melt(csv, id=c('Site', 'When'), measure=result.col.names))
+}
+
+
+PageCyclerPerms <- function(before, after, f=median, n=10^5-1) {
   # Computes a statistic and P-value for two sets of page_cycler data.
   #
   # Args:
-  #   data: A frame in long format which includes these two columns:
-  #         When: A factor (Before, After).
-  #         value: A number.
+  #   before: A vector of numbers "before" the point of interest.
+  #   after: A vector of numbers "after" the point of interest.
   #   f: The statistic to compute. Default is median.
+  #   n: The number of permutations to sample. Default is 10^5-1.
   #
   # Returns:
   #   A frame with one row and four columns:
-  #   Before: The statistic for the "Before" data.
-  #   After: The statistic for the "After" data.
+  #   Before: The statistic for the "before" data.
+  #   After: The statistic for the "after" data.
   #   Observed: The observed difference.
   #   P.value: The one-sided P-value for the observed difference.
 
-  N <- 10^5 - 1
-  sample <- numeric(N)
+  sample <- numeric(n)
 
-  times <- data$value
+  times <- c(before, after)
 
   # Find the observed statistic
-  before <- f(subset(data, When == 'Before')$value)
-  after <- f(subset(data, When == 'After')$value)
-  observed <- after - before
+  stat_before <- f(before)
+  stat_after <- f(after)
+  observed <- stat_after - stat_before
 
-  for (i in 1:N) {
+  for (i in 1:n) {
     index <- sample(length(times), size=length(times) / 2, replace=FALSE)
     sample[i] <- f(times[index]) - f(times[-index])
   }
 
-  p <- (sum(sample >= observed) + 1) / (N + 1)
+  p <- (sum(sample >= observed) + 1) / (n + 1)
 
   # Construct the results
   result <- data.frame()
-  result <- rbind(result, c(before, after, observed, p))
+  result <- rbind(result, c(stat_before, stat_after, observed, p))
   names(result) <- c('Before', 'After', 'Observed', 'P.value')
   return(result)
 }
