@@ -1,0 +1,31 @@
+alias rwt=third_party/WebKit/Tools/Scripts/run-webkit-tests
+
+_layout_tests()
+{
+    local search_prefix="third_party/WebKit/LayoutTests/"
+
+    local cur=${COMP_WORDS[COMP_CWORD]}
+
+    case $cur in
+    */)
+      local dir_part="$cur"
+      local search_path="$search_prefix$dir_part"
+      local last_part=""
+      ;;
+    *)
+      local dir_part="$(dirname "$cur")/"
+      local search_path="$search_prefix$dir_part"
+      local last_part=$(basename "$cur")
+      ;;
+    esac
+
+    local files=$(find "$search_path" -maxdepth 1 \( -name "$last_part*" -type d -printf "$dir_part%P/ " -o -name "$last_part*.html" -printf "$dir_part%P\n" \) | sed 's/^\.\///' | grep -v //)
+    #echo '***'
+    #echo "$files"
+    #echo '***'
+    local IFR=$'\n'
+    compopt -o nospace
+    COMPREPLY=( $(compgen -W "$files" -- $cur) )
+}
+complete -F _layout_tests run-webkit-tests
+complete -F _layout_tests rwt
