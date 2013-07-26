@@ -256,10 +256,13 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the WebKit folder."
       (let ((saved-point (point))
             (file-name (buffer-file-name)))
         (when (not (verify-visited-file-modtime (current-buffer)))
-          (if (buffer-modified-p)
-              (switch-to-buffer buffer))
-          (revert-buffer t (not (buffer-modified-p)) t)
-          (goto-char saved-point))))))
+          (if (not (file-exists-p file-name))
+              (kill-buffer buffer)
+            (progn
+              (if (buffer-modified-p)
+                  (switch-to-buffer buffer))
+              (revert-buffer t (not (buffer-modified-p)) t)
+              (goto-char saved-point))))))))
 
 ;; (setq edebug-all-defs nil)
 
