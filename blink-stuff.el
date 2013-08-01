@@ -147,9 +147,9 @@
                    (concat root "/../../out/*/gen/blink/bindings/V8"
                            base-name ".h")
                    ;; V8 custom code
-                   (concat root "/Source/core/bindings/v8/custom/V8Custom"
+                   (concat root "/Source/bindings/v8/custom/V8Custom"
                            base-name ".*")
-                   (concat root "/Source/core/bindings/v8/custom/V8"
+                   (concat root "/Source/bindings/v8/custom/V8"
                            base-name "Custom.*")))
         (result))
     (dolist (pattern patterns)
@@ -212,11 +212,11 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the Blink folder."
             ("\\(.*\\)/out/\\(Debug\\|Release\\)/blink/bindings/V8\\(.*\\)\\.h$"
              . ((root . (1 "/third_party/WebKit")) (base-name . 3)))
             ;; V8 custom bindings
-            ("\\(.*\\)/Source/core/bindings/v8/custom/V8Custom\\(.*\\)\\..*"
+            ("\\(.*\\)/Source/bindings/v8/custom/V8Custom\\(.*\\)\\..*"
              . ((root . 1) (base-name . 2)))
-            ("\\(.*\\)/Source/core/bindings/v8/custom/V8\\(.*\\)Custom\\..*"
+            ("\\(.*\\)/Source/bindings/v8/custom/V8\\(.*\\)Custom\\..*"
              . ((root . 1) (base-name . 2)))
-            ;; WebCore types and IDLs
+            ;; core types and IDLs
             ("\\(.*\\)/Source/core/\\([a-z/]*\\)/\\([A-Z].*\\)\\.\\(.*\\)$"
              . ((root . 1) (base-name . 3))))))
       (let* ((mk-path
