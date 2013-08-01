@@ -216,6 +216,30 @@ Returns a pair of `(ROOT . BASE-NAME)' where ROOT is the Blink folder."
               (revert-buffer t (not (buffer-modified-p)) t)
               (goto-char saved-point))))))))
 
+(defun bk-js2-narrow ()
+  "Narrows to the current script block and switches to `js2-mode'."
+  (interactive)
+  (let (start end limit)
+    (save-excursion
+      (forward-char (length "<script>"))
+      (if (not (search-backward-regexp "<script.*>" nil t))
+          (error "not in a script tag (could not find open script tag)"))
+      (setq start (match-end 0))
+      (if (not (search-forward-regexp "</script>" nil t))
+          (error "not in a script tag (could not find close script tag)"))
+      (setq end (match-beginning 0))
+      (setq limit (match-end 0)))
+    (if (> (point) limit)
+        (error "not in a script tag"))
+    (narrow-to-region start end))
+  (js2-mode))
+
+(defun bk-widen ()
+  "After `bk-js2-narrow' widens the buffer and flips it back to `html-mode'."
+  (interactive)
+  (widen)
+  (html-mode))
+
 ;; (setq edebug-all-defs nil)
 
 (provide 'blink-stuff)
