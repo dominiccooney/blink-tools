@@ -27,6 +27,7 @@
   (add-hook 'c++-mode-hook 'bk-prog-mode-hook)
   (add-hook 'html-mode-hook 'bk-html-mode-hook)
   (add-hook 'text-mode-hook 'bk-text-mode-hook)
+  (add-hook 'js2-post-parse-callbacks 'bk-js2-post-parse-callback)
 
   (setq auto-mode-alist
         (append (list '("\\.mm\\'" . objc-mode)
@@ -62,6 +63,49 @@
         (setq ff-search-directories '(".")
               ff-other-file-alist '(("-expected\\.txt$" (".html"))
                                     ("\\.html$" ("-expected.txt")))))))
+
+(defun bk-js2-post-parse-callback ()
+  ; FIXME: Make the use of these externs conditioned on the filename.
+  (setq js2-additional-externs bk-layout-test-externs))
+
+(defvar bk-externs-drt
+  (mapcar 'symbol-name '(internals gc testRunner)))
+
+(defvar bk-externs-js-test-pre
+  (mapcar 'symbol-name '(areArraysEqual debug description
+                         descriptionQuiet errorMessage escapeHTML
+                         evalAndLog finishJSTest isMinusZero
+                         isResultCorrect isSuccessfullyParsed
+                         isWorker jsTestIsAsync minorGC shouldBe
+                         shouldBeCloseTo shouldBeDefined
+                         shouldBeEmptyString shouldBeEqual
+                         shouldBeEqualToString shouldBeFalse
+                         shouldBeGreaterThanOrEqual shouldBeNaN
+                         shouldBeNonNull shouldBeNonZero
+                         shouldBeNull shouldBeTrue
+                         shouldBeTrueQuiet shouldBeType
+                         shouldBeUndefined shouldBeZero
+                         shouldBecomeDifferent shouldBecomeEqual
+                         shouldBecomeEqualToString
+                         shouldEvaluateTo shouldHaveHadError
+                         shouldNotBe shouldNotThrow shouldThrow
+                         startWorker stringify successfullyParsed
+                         testFailed testPassed )))
+
+(defvar bk-externs-testharness
+  (mapcar 'symbol-name '(add_completion_callback
+                         add_result_callback add_start_callback
+                         assert_approx_equals assert_array_equals
+                         assert_equals assert_false
+                         assert_idl_attribute assert_in_array
+                         assert_inherits assert_not_equals
+                         assert_readonly assert_regexp_match
+                         assert_throws assert_true
+                         assert_unreached async_test setup
+                         test)))
+
+(defvar bk-layout-test-externs
+  (append bk-externs-drt bk-externs-js-test-pre bk-externs-testharness))
 
 (defun bk-layout-test-file-p (file-name)
   (string-match "LayoutTests/.*/.*\\(-expected\\.txt\\|\\.html\\)$" file-name))
