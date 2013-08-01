@@ -15,7 +15,7 @@ development](http://www.chromium.org/blink)
  * [init-chromium-env.sh](webkit-tools/blob/master/init-chromium-env.sh)
    sets up some git options for Chromium development.
 
- * [html5rocks](webkit-tools/blob/master/html5rocks) has a Chrome
+ * [html5rocks](webkit-tools/tree/master/html5rocks) has a Chrome
    extension for turning off [html5rocks.com's](http://html5rocks.com)
    obnoxious dotty backgrounds.
 
@@ -24,6 +24,6 @@ The following are of historical interest only:
  * [idl-analyze.el](webkit-tools/blob/master/idl-analyze.el) is elisp
    for parsing WebKit IDL files. It has probably completely rotted.
 
- * [workflow](webkit-tools/blob/master/workflow) has some Go code for
+ * [workflow](webkit-tools/tree/master/workflow) has some Go code for
    downloading data from Buganizer and computing some statistics about
    patch acceptance rates.
