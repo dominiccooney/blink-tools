@@ -25,6 +25,8 @@
   (interactive)
 
   (add-hook 'c++-mode-hook 'bk-prog-mode-hook)
+  (add-hook 'html-mode-hook 'bk-html-mode-hook)
+  (add-hook 'text-mode-hook 'bk-text-mode-hook)
 
   (setq auto-mode-alist
         (append (list '("\\.mm\\'" . objc-mode)
@@ -46,6 +48,23 @@
       (progn
        (set-variable 'indent-tabs-mode nil)
        (set-variable 'c-basic-offset 4))))
+
+(defun bk-html-mode-hook ()
+  (bk-layout-test-hook))
+
+(defun bk-text-mode-hook ()
+  (bk-layout-test-hook))
+
+(defun bk-layout-test-hook ()
+  (if (bk-layout-test-file-p (buffer-file-name))
+      (progn
+        (local-set-key "\C-o" 'ff-get-other-file)
+        (setq ff-search-directories '(".")
+              ff-other-file-alist '(("-expected\\.txt$" (".html"))
+                                    ("\\.html$" ("-expected.txt")))))))
+
+(defun bk-layout-test-file-p (file-name)
+  (string-match "LayoutTests/.*/.*\\(-expected\\.txt\\|\\.html\\)$" file-name))
 
 (defun bk-characterize-path (file-name)
   "Characterizes a file path as V8, or co for core."
@@ -71,7 +90,6 @@
           (when (string-match (car pattern) file-name)
             (throw 'return (cdr pattern))))))
     nil))
-
 
 (defun bk-binding-alternatives (root base-name)
   "Gets file paths for a binding BASE-NAME in Blink tree at ROOT."
