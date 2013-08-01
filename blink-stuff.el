@@ -25,7 +25,6 @@
   (interactive)
 
   (add-hook 'c++-mode-hook 'bk-prog-mode-hook)
-  (add-hook 'change-log-mode-hook 'bk-change-log-mode-hook)
 
   (setq auto-mode-alist
         (append (list '("\\.mm\\'" . objc-mode)
@@ -40,8 +39,6 @@
           :background "color-149"))) "Generated file" :group 'font-lock-faces)
 
   (font-lock-add-keywords 'c++-mode
-                          '(("\\(\t+\\)" 1 'bk-tab-face)))
-  (font-lock-add-keywords 'change-log-mode
                           '(("\\(\t+\\)" 1 'bk-tab-face))))
 
 (defun bk-prog-mode-hook ()
@@ -49,11 +46,6 @@
       (progn
        (set-variable 'indent-tabs-mode nil)
        (set-variable 'c-basic-offset 4))))
-
-(defun bk-change-log-mode-hook ()
-  (if (string-match "WebKit" (buffer-file-name))
-      (let ()
-        (set-variable 'indent-tabs-mode nil))))
 
 (defun bk-characterize-path (file-name)
   "Characterizes a file path as V8, or co for core."
