@@ -4,11 +4,17 @@ import std.stdio;
 import csv;
 
 class Project {
+  this() {
+    completion = new Task();
+    tasks[completion.id] = completion;
+  }
+
   void add(Task task) {
     if (task.id in tasks) {
       throw new Exception(
           std.string.format("task \"%s\" already exists", task.id));
     }
+    completion.dependencyIds ~= task.id;
     tasks[task.id] = task;
   }
 
@@ -61,6 +67,23 @@ class Project {
     }
   }
 
+  void checkDependencyCompletionConsistency() {
+    foreach (task; tasks.byValue()) {
+      if (task.status != Task.Status.Completed) {
+        continue;
+      }
+      foreach (predecessor; task.dependencies) {
+        if (predecessor.status != Task.Status.Completed) {
+          throw new Exception(
+              std.string.format(
+                  "task %s is completed but predecessor task %s is not",
+                  task.id, predecessor.id));
+        }
+      }
+    }
+  }
+
+  Task completion;
   Task[string] tasks;
 }
 
@@ -86,18 +109,35 @@ struct RACI {
 class Task {
   this(string[] fields) {
     size_t n = 0;
-    this.project = fields[n++];
+    n++; // skip project
     this.id = fields[n++];
     this.dependencyIds =
         array(std.algorithm.filter!(s => s.length)
                                    (std.algorithm.splitter(fields[n++], ',')));
-    this.time = std.conv.to!(float)(fields[n++]);
-    n++; // skip time--actual (hours)
+    this.timePlanned = std.conv.to!(float)(fields[n++]);
+
+    string timeActual = fields[n++];
+    this.timeActual = (timeActual.length == 0)
+        ? 0.0f
+        : std.conv.to!(float)(timeActual);
     this.raci = RACI(fields[n++]);
     this.who = fields[n++];
-    n++; // skip start date
-    n++; // skip end date
+    this.startDate = fields[n++];
+    this.endDate = fields[n++];
     this.title = fields[n++];
+  }
+
+  // Completion task
+  this() {
+    this.id = "ZZ";
+    this.dependencyIds = [];
+    this.timePlanned = 0;
+    this.timeActual = 0;
+    this.raci = RACI("");
+    this.who = "";
+    this.startDate = "";
+    this.endDate = "";
+    this.title = "COMPLETION";
   }
 
   // FIXME: Tasks are designed to only be hashed and compared within
@@ -114,13 +154,66 @@ class Task {
     return std.string.cmp(this.id, std.conv.to!Task(other).id);
   }
 
-  string project;
+  @property bool isCompletion() {
+    return id == "ZZ";
+  }
+
+  enum Status {
+    NotStarted,
+    Started,
+    Completed
+  }
+
+  @property Status status() {
+    if (endDate.length) {
+      return Status.Completed;
+    }
+    if (startDate.length) {
+      return Status.Started;
+    }
+    return Status.NotStarted;
+  }
+
+  @property float timeRemaining() {
+      if (timeActual > timePlanned) {
+        throw new Exception(
+            std.string.format(
+                "need to update estimated time for task %s", id));
+      }
+      return timePlanned - timeActual;
+  }
+
+  @property auto incompleteDependencies() {
+    return (int delegate(ref Task) dg) {
+      foreach (task; dependencies) {
+        if (task.status == Status.Completed) {
+          continue;
+        }
+        if (int result = dg(task)) {
+          return result;
+        }
+      }
+      return 0;
+    };
+  }
+
+  @property auto incompleteDependenciesString() {
+    return isCompletion
+      ? ""
+      : std.array.join(
+            std.algorithm.map!(task => task.id)
+                              (array(incompleteDependencies)), ",");
+  }
+
   string id;
   string[] dependencyIds;
   Task[] dependencies;
-  float time;
+  float timePlanned;
+  float timeActual;
   RACI raci;
   string who;
+  string startDate;
+  string endDate;
   string title;
 }
 
@@ -163,31 +256,66 @@ class Schedule {
     this.resources = resources;
   }
 
-  void schedule() {
-    // calculate path duration without resource leveling
-    foreach (task; project.tasks.byValue()) {
-      pathDuration(task);
+  class Entry {
+    this(Task task) {
+      this.task = task;
+      this.end = 0.0f;
+    }
+
+    @property float start() {
+      return end + task.timeRemaining;
+    }
+
+    Task task;
+    float end;
+  }
+
+  void pushBackTo(Entry entry, float tMinus) {
+    if (tMinus <= entry.end) {
+      return;
+    }
+    entry.end = tMinus;
+    foreach (predecessor; entry.task.incompleteDependencies) {
+      if (!(predecessor in entries)) {
+        continue;
+      }
+      pushBackTo(entries[predecessor], entry.start);
     }
   }
 
-  @property Task[] criticalPath() {
-    float maxTime = 0;
-    Task maxTask = null;
+  void schedule() {
+    // calculate path duration without resource leveling; schedule
+    // late start with no buffers
 
-    foreach (task; project.tasks.byValue()) {
-      float duration = pathDuration(task);
-      if (duration > maxTime) {
-        maxTime = duration;
-        maxTask = task;
+    entries = null;
+
+    void schedule(Task task, float tMinus) {
+      Entry entry;
+      if (task in entries) {
+        entry = entries[task];
+      } else {
+        entry = entries[task] = new Entry(task);
+      }
+
+      pushBackTo(entry, tMinus);
+
+      foreach (predecessor; task.incompleteDependencies) {
+        schedule(predecessor, entry.start);
       }
     }
+    schedule(project.completion, 0);
 
+    // FIXME: do resource leveling
+  }
+
+  @property Task[] criticalPath() {
+    Task task = project.completion;
+    pathDuration(task); // populate criticalPathLink
     Task[] path = [];
-    while (maxTask) {
-      path = maxTask ~ path;
-      maxTask = criticalPathLink[maxTask];
+    while (task) {
+      path = task ~ path;
+      task = criticalPathLink[task];
     }
-
     return path;
   }
 
@@ -195,6 +323,16 @@ class Schedule {
     writeln("Critical path:");
     foreach (task; criticalPath) {
       writefln("%2s %s", task.id, task.title);
+    }
+    writeln();
+
+    writeln("Schedule:");
+    writeln("Start End   Preds. Task");
+    writeln("----- ----- ------ -----");
+    foreach (entry; entries) {
+      writefln("%5.1f %5.1f %6s %2s %-58.58s",
+               entry.start, entry.end, entry.task.incompleteDependenciesString,
+               entry.task.id, entry.task.title);
     }
   }
 
@@ -205,7 +343,7 @@ class Schedule {
 
     float maximumPredecessorTime = 0.0f;
     Task maximumPredecessor = null;
-    foreach (predecessor; task.dependencies) {
+    foreach (predecessor; task.incompleteDependencies) {
       float predecessorTime = pathDuration(predecessor);
       if (predecessorTime > maximumPredecessorTime) {
         maximumPredecessorTime = predecessorTime;
@@ -213,13 +351,23 @@ class Schedule {
       }
     }
     criticalPathLink[task] = maximumPredecessor;
-    return taskPathDuration[task] = task.time + maximumPredecessorTime;
+
+    final switch (task.status) {
+    case Task.Status.NotStarted:
+    case Task.Status.Started:
+      return taskPathDuration[task] =
+          task.timeRemaining + maximumPredecessorTime;
+
+    case Task.Status.Completed:
+      return taskPathDuration[task] = 0.0f;
+    }
   }
 
   Project project;
   Resources resources;
   float[Task] taskPathDuration; // critical path, no resource leveling
   Task[Task] criticalPathLink;  // critical path, no resource leveling
+  Entry[Task] entries;
 }
 
 void main() {
@@ -231,23 +379,23 @@ void main() {
   // strip header lines
   fields = fields[2 .. $];
 
-  // build tasks
-  auto tasks = array(std.algorithm.map!(x => new Task(x))(fields));
-
-  if (!tasks.length) {
+  if (!fields.length) {
     writefln("No tasks.");
     return;
   }
 
   // check all tasks are for the same project
-  string projectId = tasks[0].project;
-  foreach (task; tasks[1 .. $]) {
-    if (task.project != projectId) {
+  string projectId = fields[0][0];
+  foreach (row; fields[1 .. $]) {
+    if (row[0] != projectId) {
       writefln("Can't schedule multiple projects \"%s\" and \"%s\".",
-               projectId, task.project);
+               projectId, row[0]);
       return;
     }
   }
+
+  // build tasks
+  auto tasks = array(std.algorithm.map!(x => new Task(x))(fields));
 
   auto project = new Project();
   foreach (task; tasks) {
@@ -256,6 +404,7 @@ void main() {
 
   project.resolveDependencies();
   project.checkCyclicDependencies();
+  project.checkDependencyCompletionConsistency();
 
   auto schedule = new Schedule(project, resources);
 
@@ -264,10 +413,9 @@ void main() {
   resources.debugPrint();
   writeln();
 
-  writefln("%d task(s)", fields.length);
-  writeln();
-
+  schedule.schedule();
   schedule.debugPrint();
+  writeln();
 
   struct PerPersonStats {
     uint numTasks;
@@ -279,7 +427,7 @@ void main() {
       perPersonStats[task.raci.responsible] = PerPersonStats.init;
     }
     perPersonStats[task.raci.responsible].numTasks++;
-    perPersonStats[task.raci.responsible].time += task.time;
+    perPersonStats[task.raci.responsible].time += task.timePlanned;
   }
   writefln("Person     # Tasks Time (h)");
   writefln("---------- ------- --------");
