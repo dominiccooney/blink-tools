@@ -37,6 +37,7 @@ class Project {
                   id, task.id));
         }
         task.dependencies ~= predecessor;
+        predecessor.successors ~= task;
       }
     }
   }
@@ -208,13 +209,37 @@ class Task {
   string id;
   string[] dependencyIds;
   Task[] dependencies;
+  Task[] successors;
   float timePlanned;
   float timeActual;
   RACI raci;
+  Resource resource;
   string who;
   string startDate;
   string endDate;
   string title;
+}
+
+class Resource {
+  this(string name) {
+    this.name = name;
+  }
+
+  int latestStart(Task task) {
+    if (tasks.length == 0) {
+      return 0; // start immediately
+    }
+    for (auto i = 0; i < tasks.length - 1; i++) {
+    }
+    return tasks[$-1].
+  }
+
+  void schedule(Task task) {
+    // FIXME
+  }
+
+  Task[] tasks;
+  string name;
 }
 
 class Resources {
@@ -268,6 +293,10 @@ class Schedule {
 
     Task task;
     float end;
+  }
+
+  class ResourceSchedule {
+    Entry[] entries;
   }
 
   void pushBackTo(Entry entry, float tMinus) {
