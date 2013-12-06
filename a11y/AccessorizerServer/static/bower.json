@@ -1,0 +1,22 @@
+{
+  "name": "AccessorizerServer",
+  "version": "0.0.0",
+  "authors": [
+    "Dominic Cooney <dominicc@chromium.org>"
+  ],
+  "description": "Android Accessibility Debug Tool Frontend",
+  "main": "index.html",
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "platform": "Polymer/platform#master",
+    "polymer-ui-elements": "Polymer/polymer-ui-elements#master"
+  }
+}

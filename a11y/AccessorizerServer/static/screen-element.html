@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<polymer-element name="a-screen-element" attributes="element">
+  <template>
+    <style>
+      :host {
+        position: absolute;
+        top: {{element.ParentBounds.Top}}px;
+        left: {{element.ParentBounds.Left}}px;
+        width: {{element.ParentBounds.Width}}px;
+        height: {{element.ParentBounds.Height}}px;
+        border: 2px solid gray;
+        box-sizing: border-box;
+      }
+
+      #label {
+        position: absolute;
+        top: 0px;
+        left: 0px;
+        background: gray;
+        color: white;
+        padding: 0.2em;
+      }
+    </style>
+    <template if="{{element.HasAccessibilityFocus}}">
+      <style>
+        :host {
+          -webkit-box-shadow: 0px 0px 8px 4px rgba(51, 153, 255, 0.5);
+        }
+      </style>
+    </template>
+    <template if="{{element.HasInputFocus}}">
+      <style>
+        :host {
+          border: 2px solid orange;
+        }
+
+        #label {
+          background: orange;
+        }
+      </style>
+    </template>
+    <template if="{{element.Source}}">
+      <style>
+        :host {
+          -webkit-box-shadow: inset 0px 0px 8px 2px green;
+        }
+      </style>
+    </template>
+    <template if="{{element.Source && element.HasAccessibilityFocus}}">
+      <style>
+        :host {
+          -webkit-box-shadow: inset 0px 0px 8px 2px green,
+                              0px 0px 8px 4px rgba(51, 153, 255, 0.5);
+        }
+      </style>
+    </template>
+    <div id="label">
+      {{element.ClassName}}
+      <template if="{{element.HasAccessibilityFocus}}">(Acc. Focus)</template>
+      <template if="{{element.HasInputFocus}}">(Input Focus)</template>
+    </div>
+    <template repeat="{{element.Children}}">
+      <a-screen-element element="{{}}"></a-screen-element>
+    </template>
+  </template>
+<script>
+Polymer('a-screen-element');
+</script>
+</polymer-element>

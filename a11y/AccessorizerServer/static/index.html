@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<!-- Bootstrapping -->
+<script src="bower_components/platform/platform.js"></script>
+
+<!-- Polymer -->
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/polymer-ui-scaffold/polymer-ui-scaffold.html">
+<link rel="import" href="bower_components/polymer-flex-layout/polymer-flex-panel.html">
+<link rel="import" href="bower_components/polymer-ui-splitter/polymer-ui-splitter.html">
+
+<!-- Bespoke goodies -->
+<link rel="import" href="status-indicator.html">
+<link rel="import" href="websocket.html">
+<link rel="import" href="event-log.html">
+<link rel="import" href="screen-element.html">
+
+<polymer-element name="a-app">
+  <template>
+    <style>
+      #screen {
+        width: 100%;
+        height: 100%;
+        -webkit-box-shadow: 0px 0px 16px grey inset;
+        overflow: hidden;
+      }
+
+      #zoom {
+        margin: 2em;
+        width: 100%;
+        height: 100%;
+        position: relative;
+        -webkit-transform: scale(0.8);
+        -webkit-transform-origin: top left;
+      }
+    </style>
+
+    <polymer-ui-scaffold theme="polymer-ui-dark-theme" style="position: absolute; top: 0; left: 0; bottom: 0; right: 0;">
+      <div tool flex>
+        Accessorizer Android Accessibility Debug Tool &mdash;
+        Server <a-status-indicator status="{{websocketStatus}}"></a-status-indicator> /
+        Device <a-status-indicator status="{{deviceStatus}}"></a-status-indicator>
+      </div>
+      <polymer-flex-panel main horizontal style="width: 100%; height: 100%;">
+        <a-event-log id="eventLog" style="width: 20em;" selectedEvent="{{selectedEvent}}"></a-event-log>
+        <polymer-ui-splitter direction="left"></polymer-ui-splitter>
+        <div flex style="height: 100%;">
+          <div id="screen">
+            <div id="zoom">
+              <template if="{{selectedEvent.Root}}">
+                <a-screen-element element="{{selectedEvent.Root}}"></a-screen-element>
+              </template>
+            </div>
+          </div>
+        </div>
+      </polymer-flex-panel>
+    </polymer-ui-scaffold>
+
+    <a-websocket
+       status="{{websocketStatus}}"
+       deviceStatus="{{deviceStatus}}"
+       on-accessibility-event="{{accessibilityEvent}}">
+    </a-websocket>
+
+  </template>
+<script>
+Polymer('a-app', {
+  websocketStatus: 'unknown',
+  deviceStatus: 'unknown',
+  selectedEvent: null,
+  accessibilityEvent: function (event) {
+    this.$.eventLog.addEvent(event.detail);
+    this.selectedEvent = event.detail;
+  },
+});
+</script>
+</polymer-element>
+
+<style>
+body {
+  font-family: Neue Helvetica, Roboto, Arial, sans-serif;
+}
+</style>
+<a-app></a-app>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<polymer-element name="a-event-log" attributes="selectedEvent events">
+  <template>
+    <style>
+      :host {
+        display: block;
+        background: white;
+        overflow: auto;
+      }
+      thead {
+        font-weight: bold;
+      }
+      tbody > tr:hover {
+        background: mintcream;
+      }
+      tbody > tr > td:first-of-type {
+        text-align: right;
+      }
+    </style>
+    <table>
+      <thead>
+        <tr>
+          <td>Time</td>
+          <td>Event</td>
+        </tr>
+      </thead>
+      <tbody id="b">
+        <template repeat="{{events}}">
+          <tr on-click="{{rowClicked}}">
+            <td>{{EventTime}}</td>
+            <td>
+              {{EventType}}
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+  </template>
+<script>
+Polymer('a-event-log', {
+  events: [],
+  selectedEvent: null,
+  addEvent: function (event) {
+    this.events.unshift(event);
+  },
+  rowClicked: function (event) {
+    console.log(event.currentTarget.templateInstance.model);
+    this.selectedEvent = event.currentTarget.templateInstance.model;
+  }
+});
+</script>
+</polymer-element>

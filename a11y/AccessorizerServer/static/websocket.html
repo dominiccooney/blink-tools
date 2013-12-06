@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<link rel="import" href="bower_components/polymer/polymer.html">
+<polymer-element name="a-websocket" attributes="status deviceStatus">
+  <template>
+    <style>:host { display: none; }</style>
+  </template>
+<script>
+Polymer('a-websocket', {
+  ready: function () {
+    this._connect();
+  },
+
+  _connect: function () {
+    this._socket = new WebSocket("ws://localhost:9001/echo");
+    this._socket.onopen = function (event) {
+      this.status = 'connected';
+      this._timeout = 10;
+    }.bind(this);
+
+    this._socket.onclose = function (event) {
+      this.status = 'disconnected';
+      this.deviceStatus = 'unknown';
+      this._timeout *= 2;
+      window.setTimeout(this._connect.bind(this), this._timeout);
+    }.bind(this);
+
+    this._socket.onerror = function (event) {
+      this.status = 'errored';
+      this._timeout *= 2;
+      window.setTimeout(this._connect.bind(this), this._timeout);
+    }.bind(this);
+
+    this._socket.onmessage = function (event) {
+      console.debug('onmessage: ' + event.data);
+      this._parse(event.data);
+    }.bind(this);
+  },
+
+  _timeout: 10,
+
+  _parse: function (unformattedMessage) {
+    try {
+      message = JSON.parse(unformattedMessage);
+    } catch (e) {
+      console.error('JSON.parse: ' + e);
+      return;
+    }
+
+    if ('DeviceStatus' in message) {
+      this.deviceStatus = message.DeviceStatus;
+    } else if ('EventType' in message) {
+      this.fire('accessibility-event', message);
+    }
+  }
+});
+</script>
+</polymer-element>

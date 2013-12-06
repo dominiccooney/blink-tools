@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<link rel="import" href="bower_components/polymer/polymer.html">
+<polymer-element name="a-status-indicator" attributes="status" noscript>
+  <template>
+    <style>
+      :host {
+        display: inline-block;
+        width: 1em;
+        height: 1em;
+        border-radius: 0.5em;
+        background-color: orange;
+        text-align: center;
+        font-size: small;
+        content: '?';
+      }
+
+      :host([status=connected]):host {
+        background-color: green;
+        content: 'OK';
+      }
+
+      :host([status=disconnected]):host {
+        background-color: red;
+        content: 'NG';
+      }
+    </style>
+  </template>
+</polymer-element>
