@@ -27,7 +27,11 @@ Accessorizer/res/xml/accessorizer_service_config.xml, but YMMV.
 
 This setup is pretty fragile. Here is how to replicate it:
 
-- Build and deploy Accessorizer.apk to a device.
+- Build and deploy Accessorizer.apk to a device. If you're using
+  Eclipse from the Android SDK, creating a workspace pointing to a11y
+  and doing File, Import, General, Existing Project into Workspace;
+  then selecting Accessorizer and accepting the defaults might be
+  useful.
 
 - On your device, in Settings, Accessibility, Accessorizer, turn the
   accessibility service on.
@@ -40,14 +44,16 @@ This setup is pretty fragile. Here is how to replicate it:
   tcp:9000`.
 
 - Build and deploy ContentShell.apk per the [Android build
-  instructions.](https://code.google.com/p/chromium/wiki/AndroidBuildInstructions) Accessorizer only listens to Content Shell*.
+  instructions.](https://code.google.com/p/chromium/wiki/AndroidBuildInstructions) Accessorizer only listens to Content Shell.
 
 - Install [Node](http://nodejs.org) and [Bower.](http://bower.io)
 
-- In AccessorizerServer, run `bower install` to grab Polymer.
+- In AccessorizerServer/static, run `bower install` to grab
+  Polymer. If Bower offers you new hotness like platform#master or old
+  bustedness like platform#~0.1.0, choose the new hotness.
 
 - Per [How to Write Go Code](http://golang.org/doc/code.html) set
-  GOPATH. Then `go get http://code.google.com/p/go.net/websocket` .
+  GOPATH. Then `go get code.google.com/p/go.net/websocket` .
 
 - In AccessorizerServer, `go run main.go` to start the server.
 
