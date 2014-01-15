@@ -242,7 +242,9 @@ public class AccessorizerService extends AccessibilityService {
 	    	AccessibilityNodeInfo source = event.getSource();
 	    	AccessibilityNodeInfo root = getRootInActiveWindow();
 	    	encodeSubtree(s, root, source, new Rect());
-	    	root.recycle();
+	    	if (root != null) {
+	    		root.recycle();
+	    	}
 	    	if (source != root && source != null) {
 	    		source.recycle();
 	    	}
