@@ -22,6 +22,9 @@ func maybeSetContentTypeFromPath(w http.ResponseWriter, path string) {
 }
 
 func checkPath(path string, root string) (string, error) {
+	if len(path) == 0 {
+		path = "index.html"
+	}
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
