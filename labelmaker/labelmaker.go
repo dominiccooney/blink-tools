@@ -82,7 +82,7 @@ func (p *issueParser) id() int {
 }
 
 func (p *issueParser) title() string {
-	return "foo"
+	return p.entry["title"].(map[string]interface{})["$t"].(string)
 }
 
 func (p *issueParser) content() string {
