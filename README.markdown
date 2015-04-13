@@ -15,15 +15,14 @@ development](http://www.chromium.org/blink)
  * [init-chromium-env.sh](init-chromium-env.sh)
    sets up some git options for Chromium development.
 
- * [html5rocks](../../tree/master/html5rocks) has a Chrome
-   extension for turning off [html5rocks.com's](http://html5rocks.com)
-   obnoxious dotty backgrounds.
+ * [a11y](a11y) has an Android accessibility agent that dumps
+   accessibility events, useful for debugging the accessibility
+   integration of web platform stuff.
+
+ * [serving](serving) has some Go scripts that do reverse proxies and
+   set no-caching headers, useful for debugging Service Workers.
 
 The following are of historical interest only:
 
  * [idl-analyze.el](idl-analyze.el) is elisp
    for parsing WebKit IDL files. It has probably completely rotted.
-
- * [workflow](../../tree/master/workflow) has some Go code for
-   downloading data from Buganizer and computing some statistics about
-   patch acceptance rates.
