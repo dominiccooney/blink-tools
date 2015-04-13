@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"html"
 	"regexp"
 )
 
@@ -85,7 +86,7 @@ func (p *issueParser) title() string {
 }
 
 func (p *issueParser) content() string {
-	return "bar"
+	return html.UnescapeString(p.entry["content"].(map[string]interface{})["$t"].(string))
 }
 
 func (p *issueParser) state() state {
