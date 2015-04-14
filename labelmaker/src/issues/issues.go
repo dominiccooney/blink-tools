@@ -1,6 +1,6 @@
 // Machine larnin' on the Chromium issue tracker.
 
-package main
+package issues
 
 import (
 	"strconv"
