@@ -34,16 +34,18 @@ const (
 	statusArchived                  = "Archived"
 )
 
+type labels []string
+
 type issue struct {
 	id      int
 	title   string
 	content string
 	state   state
 	status  status
-	labels  []string
+	labels  labels
 }
 
-func parseIssue(entry map[string]interface{}) (*issue, error) {
+func parseIssueDecodedJson(entry map[string]interface{}) (*issue, error) {
 	p := newIssueParser(entry)
 	issue := &issue{
 		p.id(),
@@ -90,15 +92,49 @@ func (p *issueParser) content() string {
 }
 
 func (p *issueParser) state() state {
-	return false
+	s := p.entry["issues$state"].(map[string]interface{})["$t"].(string)
+	switch s {
+	case "closed":
+		return stateClosed
+	case "open":
+		return stateOpen
+	default:
+		p.err = fmt.Errorf("Unrecognized state \"%s\"", s)
+		return stateClosed
+	}
 }
 
 func (p *issueParser) status() status {
-	return statusArchived
+	return status(p.entry["issues$status"].(map[string]interface{})["$t"].(string))
 }
 
 func (p *issueParser) labels() []string {
-	return nil
+	var ls []string = nil
+	for _, value := range p.entry["issues$label"].([]interface{}) {
+		ls = append(ls, value.(map[string]interface{})["$t"].(string))
+	}
+	return ls
+}
+
+func parseIssuesJson(content []byte) ([]*issue, error) {
+        var doc interface{}
+	err := json.Unmarshal(content, &doc)
+	if err != nil {
+		return nil, err
+	}
+	return parseIssuesDecodedJson(doc)
+}
+
+func parseIssuesDecodedJson(doc interface{}) ([]*issue, error) {
+	var issues []*issue
+	for _, entry := range doc.(map[string]interface{})["feed"].(map[string]interface{})["entry"].([]interface{}) {
+		issue, err := parseIssueDecodedJson(entry.(map[string]interface{}))
+		if err != nil {
+			return nil, err
+		}
+		issues = append(issues, issue)
+	}
+	return issues, nil
 }
 
 func parseIssues() ([]*issue, error) {
@@ -108,28 +144,7 @@ func parseIssues() ([]*issue, error) {
 	if err != nil {
 		return nil, err
 	}
-
-        var doc interface{}
-	err = json.Unmarshal(bytes, &doc)
-	if err != nil {
-		return nil, err
-	}
-
-	var issues []*issue
-	for _, entry := range doc.(map[string]interface{})["feed"].(map[string]interface{})["entry"].([]interface{}) {
-		switch entry.(type) {
-		case map[string]interface{}:
-			issue, err := parseIssue(entry.(map[string]interface{}))
-			if err != nil {
-				return nil, err
-			}
-			issues = append(issues, issue)
-			break
-		default:
-			return nil, fmt.Errorf("Entries contained non-entry, %v", entry)
-		}
-	}
-	return issues, nil
+	return parseIssuesJson(bytes)
 }
 
 func main() {
