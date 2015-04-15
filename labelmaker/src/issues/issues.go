@@ -18,12 +18,11 @@
 package issues
 
 import (
-	"strconv"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"html"
 	"regexp"
+	"strconv"
 )
 
 // State indicates whether an issue is open or closed.
@@ -83,7 +82,7 @@ func parseIssueDecodedJson(entry map[string]interface{}) (*Issue, error) {
 
 type issueParser struct {
 	entry map[string]interface{}
-	err error
+	err   error
 }
 
 func newIssueParser(entry map[string]interface{}) *issueParser {
@@ -125,19 +124,31 @@ func (p *issueParser) state() State {
 }
 
 func (p *issueParser) status() Status {
-	return Status(p.entry["issues$status"].(map[string]interface{})["$t"].(string))
+	s := p.entry["issues$status"]
+	if s == nil {
+		// Issue 475886 has no status, but viewed through the
+		// FE it is apparently untriaged:
+		// https://code.google.com/feeds/issues/p/chromium/issues/full/?q=475886&alt=json
+		// https://crbug.com/475886
+		return StatusUntriaged
+	}
+	return Status(s.(map[string]interface{})["$t"].(string))
 }
 
 func (p *issueParser) labels() Labels {
 	var ls []string = nil
-	for _, value := range p.entry["issues$label"].([]interface{}) {
+	labelsJson := p.entry["issues$label"]
+	if labelsJson == nil {
+		return nil
+	}
+	for _, value := range labelsJson.([]interface{}) {
 		ls = append(ls, value.(map[string]interface{})["$t"].(string))
 	}
 	return ls
 }
 
-func parseIssuesJson(content []byte) ([]*Issue, error) {
-        var doc interface{}
+func ParseIssuesJson(content []byte) ([]*Issue, error) {
+	var doc interface{}
 	err := json.Unmarshal(content, &doc)
 	if err != nil {
 		return nil, err
@@ -145,9 +156,17 @@ func parseIssuesJson(content []byte) ([]*Issue, error) {
 	return parseIssuesDecodedJson(doc)
 }
 
+func feed(doc map[string]interface{}) map[string]interface{} {
+	return doc["feed"].(map[string]interface{})
+}
+
+func entries(feed map[string]interface{}) []interface{} {
+	return feed["entry"].([]interface{})
+}
+
 func parseIssuesDecodedJson(doc interface{}) ([]*Issue, error) {
 	var issues []*Issue
-	for _, entry := range doc.(map[string]interface{})["feed"].(map[string]interface{})["entry"].([]interface{}) {
+	for _, entry := range entries(feed(doc.(map[string]interface{}))) {
 		issue, err := parseIssueDecodedJson(entry.(map[string]interface{}))
 		if err != nil {
 			return nil, err
@@ -155,14 +174,4 @@ func parseIssuesDecodedJson(doc interface{}) ([]*Issue, error) {
 		issues = append(issues, issue)
 	}
 	return issues, nil
-}
-
-func ParseIssues() ([]*Issue, error) {
-	// TODO: This just pulls in canned test data from one file.
-	const filePath = "sample-issues.json"
-	bytes, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-	return parseIssuesJson(bytes)
 }
