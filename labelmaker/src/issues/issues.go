@@ -1,5 +1,20 @@
-// Machine larnin' on the Chromium issue tracker.
-
+// Package issues parses issues from the Chromium issue tracker.
+//
+// Most issues can be downloaded from this URL:
+// https://code.google.com/feeds/issues/p/chromium/issues/full?
+//
+// The set of issues returned can be refined with query string
+// parameters; here are some useful ones:
+//
+// * (crbug.com query parameters, eg q=-is:open to skip open issues)
+// * updated-min=YYYY-mm-ddT00:00:00
+// * updated-max=...
+// * alt=json (for JSON instead of XML)
+// * start-index=26 (first issue on page)
+// * max-results=25 (page size)
+//
+// See https://code.google.com/p/support/wiki/IssueTrackerAPI and
+// https://code.google.com/p/chromium/issues/searchtips for more.
 package issues
 
 import (
@@ -11,43 +26,48 @@ import (
 	"regexp"
 )
 
-type state bool
+// State indicates whether an issue is open or closed.
+type State bool
 
 const (
-	stateClosed state = false
-	stateOpen         = true
+	StateClosed State = false
+	StateOpen         = true
 )
 
-type status string
+type Status string
 
 const (
-	statusUnconfirmed        status = "Unconfirmed"
-	statusUntriaged                 = "Untriaged"
-	statusAvailable                 = "Available"
-	statusAssigned                  = "Assigned"
-	statusStarted                   = "Started"
-	statusExternalDependency        = "ExternalDependency"
-	statusFixed                     = "Fixed"
-	statusVerified                  = "Verified"
-	statusDuplicate                 = "Duplicate"
-	statusWontFix                   = "WontFix"
-	statusArchived                  = "Archived"
+	StatusUnconfirmed        Status = "Unconfirmed"
+	StatusUntriaged                 = "Untriaged"
+	StatusAvailable                 = "Available"
+	StatusAssigned                  = "Assigned"
+	StatusStarted                   = "Started"
+	StatusExternalDependency        = "ExternalDependency"
+	StatusFixed                     = "Fixed"
+	StatusVerified                  = "Verified"
+	StatusDuplicate                 = "Duplicate"
+	StatusWontFix                   = "WontFix"
+	StatusArchived                  = "Archived"
 )
 
-type labels []string
+// Labels is a set of string labels. Labels are an open taxonomy. Some
+// tools attach special meaning to specific labels. Some labels have
+// structure, for example, Cr-X-Y refers to the X component's Y
+// subcomponent.
+type Labels []string
 
-type issue struct {
-	id      int
-	title   string
-	content string
-	state   state
-	status  status
-	labels  labels
+type Issue struct {
+	Id      int
+	Title   string
+	Content string
+	State   State
+	Status  Status
+	Labels  Labels
 }
 
-func parseIssueDecodedJson(entry map[string]interface{}) (*issue, error) {
+func parseIssueDecodedJson(entry map[string]interface{}) (*Issue, error) {
 	p := newIssueParser(entry)
-	issue := &issue{
+	issue := &Issue{
 		p.id(),
 		p.title(),
 		p.content(),
@@ -91,24 +111,24 @@ func (p *issueParser) content() string {
 	return html.UnescapeString(p.entry["content"].(map[string]interface{})["$t"].(string))
 }
 
-func (p *issueParser) state() state {
+func (p *issueParser) state() State {
 	s := p.entry["issues$state"].(map[string]interface{})["$t"].(string)
 	switch s {
 	case "closed":
-		return stateClosed
+		return StateClosed
 	case "open":
-		return stateOpen
+		return StateOpen
 	default:
 		p.err = fmt.Errorf("Unrecognized state \"%s\"", s)
-		return stateClosed
+		return StateClosed
 	}
 }
 
-func (p *issueParser) status() status {
-	return status(p.entry["issues$status"].(map[string]interface{})["$t"].(string))
+func (p *issueParser) status() Status {
+	return Status(p.entry["issues$status"].(map[string]interface{})["$t"].(string))
 }
 
-func (p *issueParser) labels() []string {
+func (p *issueParser) labels() Labels {
 	var ls []string = nil
 	for _, value := range p.entry["issues$label"].([]interface{}) {
 		ls = append(ls, value.(map[string]interface{})["$t"].(string))
@@ -116,7 +136,7 @@ func (p *issueParser) labels() []string {
 	return ls
 }
 
-func parseIssuesJson(content []byte) ([]*issue, error) {
+func parseIssuesJson(content []byte) ([]*Issue, error) {
         var doc interface{}
 	err := json.Unmarshal(content, &doc)
 	if err != nil {
@@ -125,8 +145,8 @@ func parseIssuesJson(content []byte) ([]*issue, error) {
 	return parseIssuesDecodedJson(doc)
 }
 
-func parseIssuesDecodedJson(doc interface{}) ([]*issue, error) {
-	var issues []*issue
+func parseIssuesDecodedJson(doc interface{}) ([]*Issue, error) {
+	var issues []*Issue
 	for _, entry := range doc.(map[string]interface{})["feed"].(map[string]interface{})["entry"].([]interface{}) {
 		issue, err := parseIssueDecodedJson(entry.(map[string]interface{}))
 		if err != nil {
@@ -137,7 +157,7 @@ func parseIssuesDecodedJson(doc interface{}) ([]*issue, error) {
 	return issues, nil
 }
 
-func parseIssues() ([]*issue, error) {
+func ParseIssues() ([]*Issue, error) {
 	// TODO: This just pulls in canned test data from one file.
 	const filePath = "sample-issues.json"
 	bytes, err := ioutil.ReadFile(filePath)
@@ -145,12 +165,4 @@ func parseIssues() ([]*issue, error) {
 		return nil, err
 	}
 	return parseIssuesJson(bytes)
-}
-
-func main() {
-	issues, err := parseIssues()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%d issues, from %d to %d\n", len(issues), issues[0].id, issues[len(issues)-1].id)
 }

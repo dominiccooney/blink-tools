@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func (xs labels) equals(ys labels) bool {
+func (xs Labels) equals(ys Labels) bool {
 	if len(xs) != len(ys) {
 		return false
 	}
@@ -16,8 +16,8 @@ func (xs labels) equals(ys labels) bool {
 	return true
 }
 
-func (i issue) equals(j issue) bool {
-	return i.id == j.id && i.title == j.title && i.content == j.content && i.state == j.state && i.status == j.status && i.labels.equals(j.labels)
+func (i Issue) equals(j Issue) bool {
+	return i.Id == j.Id && i.Title == j.Title && i.Content == j.Content && i.State == j.State && i.Status == j.Status && i.Labels.equals(j.Labels)
 }
 
 func TestParseIssues(t *testing.T) {
@@ -30,12 +30,12 @@ func TestParseIssues(t *testing.T) {
 	if 2 != len(issues) {
 		t.Errorf("expected to parse 2 issues but was %d", len(issues));
 	}
-	expected := issue{
+	expected := Issue{
 		476406,
 		"Title of the first issue",
 		"The < content of the first issue",
-		stateClosed,
-		statusWontFix,
+		StateClosed,
+		StatusWontFix,
 		[]string{"OS-Mac", "Pri-2", "Type-Bug", "OS-Linux", "clang"},
 	}
 	if !expected.equals(*issues[0]) {
