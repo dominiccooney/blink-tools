@@ -43,9 +43,9 @@ func main() {
 	// Divide into dev, validation and test sets. Use a fixed seed
 	// so that the sets are always the same.
 	r := rand.New(rand.NewSource(42))
-	var dev []*issue = nil
-	var validation []*issue = nil
-	var test []*issue = nil
+	var dev []*issues.Issue = nil
+	var validation []*issues.Issue = nil
+	var test []*issues.Issue = nil
 	for _, i := range is {
 		switch r.Intn(9) {
 		case 0:
