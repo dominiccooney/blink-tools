@@ -3,12 +3,16 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"issues"
+	"log"
 	"math/rand"
 	"ml"
+	"os"
 	"path/filepath"
+	"runtime/pprof"
 	"strings"
 )
 
@@ -95,7 +99,20 @@ func extractFeatures(examples []ml.Example) (features []ml.Feature) {
 	return
 }
 
+var cpuprofile = flag.String("cpuprofile", "", "write CPU profile to file")
+
 func main() {
+	flag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
+
 	is, err := loadIssues()
 	if err != nil {
 		panic(err)
@@ -133,6 +150,10 @@ func main() {
 			labels[label] = true
 		}
 	}
+
+	// TODO: Remove this. Shrunk to get profiling results.
+	dev = dev[0:1000]
+	test = test[0:1000]
 
 	// Build features.
 	features := extractFeatures(dev)

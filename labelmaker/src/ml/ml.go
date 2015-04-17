@@ -60,18 +60,21 @@ type Feature interface {
 	Test(Example) bool
 }
 
-type DecisionStump struct {
-	Feature Feature
-	c       map[Label]float64
-	zt      float64
+type stumpProbabilityKey struct {
+	hasFeature bool
+	label Label
+	hasLabel bool
 }
 
-func (d *DecisionStump) Predict(e Example, l Label) float64 {
-	if !d.Feature.Test(e) {
-		// TODO: Silly to predict label absence this way.
-		return -1.0
-	}
-	return d.c[l]
+type DecisionStump struct {
+	Feature Feature
+	p map[stumpProbabilityKey]float64
+	e_t float64
+}
+
+// Predict indicates whether e has label l.
+func (d *DecisionStump) Predict(e Example, l Label) bool {
+	return d.p[stumpProbabilityKey{d.Feature.Test(e), l, true}] > 0.5
 }
 
 type DecisionStumper struct {
@@ -91,79 +94,46 @@ func NewDecisionStumper(fs []Feature, es []Example) *DecisionStumper {
 	return &DecisionStumper{labels, fs, es}
 }
 
-type key struct {
-	b bool
-	f Feature
-	l Label
-}
-
-func (k key) String() string {
-	return fmt.Sprintf("{%s %s: %v}", k.f, k.l, k.b)
-}
-
 func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionStump {
-	// See Boosting p. 314
-	// Pick a feature split that minimizes:
-	// Z = 2 * sum: forall values j . forall labels l . sqrt (W_+^jl * W_-^jl)
-	// Where:
-	// W_b^jl is forall examples i . D(i,l) * 1{x_i is in Xj, Y_i[l]=b}
-	// D(i,l) is a distribution for label l over examples i.
-	//
-	// For now, we only support binary features and stumps which
-	// split on one feature.
+	var bestStump *DecisionStump = nil
 
-	// Compute W_+^jl, W_-^jl
-	var w map[key]float64 = make(map[key]float64)
+	// Consider each feature as a potential stump.
 	for _, feature := range stumper.features {
-		for label, _ := range stumper.labels {
-			w[key{true, feature, label}] = 0.0
-			w[key{false, feature, label}] = 0.0
-		}
-
+		counts := make(map[stumpProbabilityKey]float64)
 		for i, example := range stumper.examples {
-			if !feature.Test(example) {
-				continue
-			}
+			b := feature.Test(example)
 			for label, _ := range stumper.labels {
-				b := example.HasLabel(label)
-				w[key{b, feature, label}] += ds[label].P[i]
+				counts[stumpProbabilityKey{b, label, example.HasLabel(label)}] += ds[label].P[i];
 			}
 		}
-	}
 
-	// Find the feature that minimizes Z_t:
-	// TODO: Boosting sums over features in Z_t; should we be seleting the
-	// feature with the highest score here to minimize Z_t or the minimum?
-	// Doesn't make sense to take something with a high score because
-	// that feature sucks, right?
-	var fMin Feature = nil
-	var zMin float64 = math.MaxFloat64
-	zt := 0.0
-
-	for _, feature := range stumper.features {
-		zFeature := 0.0
-		for label, _ := range stumper.labels {
-			zFeature += math.Sqrt(w[key{true, feature, label}] * w[key{false, feature, label}])
-		}
-		if zFeature < zMin {
-			fMin = feature
-			zMin = zFeature
+		// Normalize probabilities.
+		for _, hasFeature := range []bool{false, true} {
+			for label, _ := range stumper.labels {
+				denom := counts[stumpProbabilityKey{hasFeature, label, false}] + counts[stumpProbabilityKey{hasFeature, label, true}]
+				counts[stumpProbabilityKey{hasFeature, label, false}] /= denom
+				counts[stumpProbabilityKey{hasFeature, label, true}] /= denom
+			}
 		}
 
-		// TODO: Is this right? zt is minimized in the next step but
-		// the selected feature isn't reflected in zt for this step.
-		zt += zFeature
-	}
-	zt *= 2.0
+		stump := &DecisionStump{feature, counts, 0.0}
 
-	// Compute c_jl for this feature (j) for each label:
-	c := make(map[Label]float64)
-	for label, _ := range stumper.labels {
-		// 1.0+ is to avoid the case when either of these is 0.
-		c[label] = 0.5 * math.Log((1.0+w[key{true, fMin, label}])/(1.0+w[key{false, fMin, label}]))
+		// Calculate e_t, the Hamming loss splitting on feature:
+		for i, example := range stumper.examples {
+			for label, _ := range stumper.labels {
+				if example.HasLabel(label) != stump.Predict(example, label) {
+					stump.e_t += ds[label].P[i];
+				}
+			}
+		}
+
+		if bestStump == nil || stump.e_t < bestStump.e_t {
+			fmt.Printf("New best stump %f: \"%s\"\n", stump.e_t, stump.Feature)
+			bestStump = stump
+		}
 	}
 
-	return &DecisionStump{fMin, c, zt}
+	return bestStump
 }
 
 type AdaBoostMH struct {
@@ -172,17 +142,25 @@ type AdaBoostMH struct {
 	Stumper *DecisionStumper
 	D       map[Label]*Distribution
 	H       []*DecisionStump
+	A       []float64
 }
 
 func NewAdaBoostMH(es []Example, learner *DecisionStumper) *AdaBoostMH {
 	dist := make(map[Label]*Distribution)
 	for label, _ := range learner.labels {
 		dist[label] = UniformDistribution(len(es))
+
+		// The probability distribution is normalized by
+		// number of labels.
+		for i := range dist[label].P {
+			dist[label].P[i] /= float64(len(learner.labels))
+		}
 	}
 	return &AdaBoostMH{
 		es,
 		learner,
 		dist,
+		nil,
 		nil,
 	}
 }
@@ -195,21 +173,43 @@ func hasLabel(e Example, l Label) float64 {
 	}
 }
 
+func predict(h *DecisionStump, e Example, l Label) float64 {
+	if h.Predict(e, l) {
+		return 1.0
+	} else {
+		return -1.0
+	}
+}
+
 func (a *AdaBoostMH) Round() {
 	h := a.Stumper.NewStump(a.D)
+	if h.e_t < 0.0 || h.e_t > 1.0 {
+		fmt.Printf("bad error: %f", h.e_t)
+	}
+	a_t := 0.5 * math.Log((1 - h.e_t) / h.e_t)
+	scale := make([]float64, len(a.Examples), len(a.Examples))
+	sum := 0.0
 	for label, _ := range a.Stumper.labels {
 		for i, example := range a.Examples {
-			a.D[label].P[i] *= math.Exp(hasLabel(example, label)*h.Predict(example, label)) / h.zt
+			scale[i] = math.Exp(-a_t * hasLabel(example, label)*predict(h, example, label))
+			sum += scale[i]
+		}
+	}
+	for label, _ := range a.Stumper.labels {
+		for i := range a.Examples {
+			a.D[label].P[i] *= scale[i] / sum
 		}
 	}
 	a.H = append(a.H, h)
+	a.A = append(a.A, a_t)
 }
 
 func (a *AdaBoostMH) Predict(e Example, l Label) float64 {
 	sum := 0.0
-	for _, h := range a.H {
-		sum += h.Predict(e, l)
+	for i, h := range a.H {
+		sum += a.A[i] * predict(h, e, l)
 	}
+	//fmt.Printf("%s %f %s\n", fmt.Sprintf("%s", e)[22:40], sum, l)
 	return sum
 }
 
