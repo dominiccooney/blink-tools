@@ -7,14 +7,14 @@ import (
 )
 
 type Distribution struct {
-	Cumulative []float64
+	P []float64
 }
 
 // UniformDistribution returns a new, uniform distribution over nitems items.
 func UniformDistribution(nitems int) *Distribution {
 	distribution := make([]float64, nitems, nitems)
 	for i := range distribution {
-		distribution[i] = float64(i+1) * 1.0 / float64(nitems)
+		distribution[i] = 1.0 / float64(nitems)
 	}
 	return &Distribution{distribution}
 }
@@ -22,31 +22,29 @@ func UniformDistribution(nitems int) *Distribution {
 // Sample draws a sample, weighted by a distribution, and returns the
 // index of the sample.
 func (dist *Distribution) Sample(r *rand.Rand) int {
-	return dist.search(r.Float64(), 0, len(dist.Cumulative))
-}
-
-func (dist *Distribution) P(i int) float64 {
-	if i == 0 {
-		return dist.Cumulative[0]
-	} else {
-		return dist.Cumulative[i] - dist.Cumulative[i-1]
+	cumulative := make([]float64, len(dist.P), len(dist.P))
+	sum := 0.0
+	for i, p := range dist.P {
+		sum += p
+		cumulative[i] = sum
 	}
+	return search(r.Float64(), cumulative, 0, len(cumulative))
 }
 
 // search does a binary search to find the index i such that:
 // C_i-1 < sample <= C_i
-func (dist *Distribution) search(s float64, startInclusive int, endExclusive int) int {
+func search(s float64, cumulative []float64, startInclusive int, endExclusive int) int {
 	if startInclusive == endExclusive {
-		if !(s <= dist.Cumulative[0] && (startInclusive == 0 || dist.Cumulative[startInclusive-1] < s)) {
+		if !(s <= cumulative[0] && (startInclusive == 0 || cumulative[startInclusive-1] < s)) {
 			panic("Search did not find a valid index. Is the cumulative distribution valid?")
 		}
 		return startInclusive
 	}
 	mid := startInclusive + (endExclusive-startInclusive)/2
-	if s < dist.Cumulative[mid] {
-		return dist.search(s, startInclusive, mid)
+	if s < cumulative[mid] {
+		return search(s, cumulative, startInclusive, mid)
 	}
-	return dist.search(s, mid, endExclusive)
+	return search(s, cumulative, mid, endExclusive)
 }
 
 type Label string
@@ -65,6 +63,7 @@ type Feature interface {
 type DecisionStump struct {
 	Feature Feature
 	c       map[Label]float64
+	zt      float64
 }
 
 func (d *DecisionStump) Predict(e Example, l Label) float64 {
@@ -126,13 +125,9 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 			}
 			for label, _ := range stumper.labels {
 				b := example.HasLabel(label)
-				w[key{b, feature, label}] += ds[label].P(i)
+				w[key{b, feature, label}] += ds[label].P[i]
 			}
 		}
-	}
-
-	for key, val := range w {
-		fmt.Printf("%v: %v\n", key, val)
 	}
 
 	// Find the feature that minimizes Z_t:
@@ -142,17 +137,23 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 	// that feature sucks, right?
 	var fMin Feature = nil
 	var zMin float64 = math.MaxFloat64
+	zt := 0.0
+
 	for _, feature := range stumper.features {
 		zFeature := 0.0
 		for label, _ := range stumper.labels {
 			zFeature += math.Sqrt(w[key{true, feature, label}] * w[key{false, feature, label}])
 		}
-		fmt.Printf("%v Z=%f\n", feature, zFeature)
 		if zFeature < zMin {
 			fMin = feature
 			zMin = zFeature
 		}
+
+		// TODO: Is this right? zt is minimized in the next step but
+		// the selected feature isn't reflected in zt for this step.
+		zt += zFeature
 	}
+	zt *= 2.0
 
 	// Compute c_jl for this feature (j) for each label:
 	c := make(map[Label]float64)
@@ -161,5 +162,67 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 		c[label] = 0.5 * math.Log((1.0+w[key{true, fMin, label}])/(1.0+w[key{false, fMin, label}]))
 	}
 
-	return &DecisionStump{fMin, c}
+	return &DecisionStump{fMin, c, zt}
+}
+
+type AdaBoostMH struct {
+	Examples []Example
+	// TODO: Generalize DecisionStumper/DecisionStump to any base learner.
+	Stumper *DecisionStumper
+	D       map[Label]*Distribution
+	H       []*DecisionStump
+}
+
+func NewAdaBoostMH(es []Example, learner *DecisionStumper) *AdaBoostMH {
+	dist := make(map[Label]*Distribution)
+	for label, _ := range learner.labels {
+		dist[label] = UniformDistribution(len(es))
+	}
+	return &AdaBoostMH{
+		es,
+		learner,
+		dist,
+		nil,
+	}
+}
+
+func hasLabel(e Example, l Label) float64 {
+	if e.HasLabel(l) {
+		return 1.0
+	} else {
+		return -1.0
+	}
+}
+
+func (a *AdaBoostMH) Round() {
+	h := a.Stumper.NewStump(a.D)
+	for label, _ := range a.Stumper.labels {
+		for i, example := range a.Examples {
+			a.D[label].P[i] *= math.Exp(hasLabel(example, label)*h.Predict(example, label)) / h.zt
+		}
+	}
+	a.H = append(a.H, h)
+}
+
+func (a *AdaBoostMH) Predict(e Example, l Label) float64 {
+	sum := 0.0
+	for _, h := range a.H {
+		sum += h.Predict(e, l)
+	}
+	return sum
+}
+
+// Hamming distance; lower is better.
+func (a *AdaBoostMH) Evaluate(test []Example) int {
+	dist := 0
+	for _, example := range test {
+		for label, _ := range a.Stumper.labels {
+			if a.Predict(example, label) > 0.0 && example.HasLabel(label) {
+				continue
+			}
+			dist++
+		}
+	}
+	// TODO: Maybe normalize this?
+	return dist
 }

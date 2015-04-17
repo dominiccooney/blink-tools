@@ -145,8 +145,11 @@ func main() {
 	}
 
 	stumper := ml.NewDecisionStumper(features, dev)
-	stump := stumper.NewStump(dist)
-	fmt.Printf("First stump: %v\n", stump.Feature)
+	booster := ml.NewAdaBoostMH(dev, stumper)
 
-	// Evaluate a decision stump.
+
+	for i := 0; i < 10; i++ {
+		booster.Round()
+		fmt.Printf("%d: dev=%d test=%d %v\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.H[i].Feature)
+	}
 }
