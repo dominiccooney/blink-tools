@@ -147,7 +147,6 @@ func main() {
 	stumper := ml.NewDecisionStumper(features, dev)
 	booster := ml.NewAdaBoostMH(dev, stumper)
 
-
 	for i := 0; i < 10; i++ {
 		booster.Round()
 		fmt.Printf("%d: dev=%d test=%d %v\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.H[i].Feature)

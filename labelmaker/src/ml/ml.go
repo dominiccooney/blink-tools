@@ -68,7 +68,8 @@ type DecisionStump struct {
 
 func (d *DecisionStump) Predict(e Example, l Label) float64 {
 	if !d.Feature.Test(e) {
-		return 0.0
+		// TODO: Silly to predict label absence this way.
+		return -1.0
 	}
 	return d.c[l]
 }
