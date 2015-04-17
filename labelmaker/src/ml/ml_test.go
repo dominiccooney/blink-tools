@@ -17,7 +17,7 @@ func TestSamplerUnitaryDistribution(t *testing.T) {
 
 type reflectedFeature struct {
 	name  string
-	value reflect.Value
+	value string
 }
 
 func (r *reflectedFeature) String() string {
@@ -25,7 +25,7 @@ func (r *reflectedFeature) String() string {
 }
 
 func (r *reflectedFeature) Test(e Example) bool {
-	val := reflect.ValueOf(e).MethodByName(r.name).Call(nil)[0]
+	val := reflect.ValueOf(e).MethodByName(r.name).Call(nil)[0].String()
 	return r.value == val
 }
 
@@ -61,13 +61,13 @@ func TestDecisionStump(t *testing.T) {
 		&datum{"red", "heavy", "vehicle"},
 		&datum{"red", "light", "fruit"},
 		&datum{"yellow", "light", "fruit"},
-		&datum{"white", "heavy", "vehicle"},
+		&datum{"yellow", "light", "vehicle"},
 	}
 
 	features := []Feature{
-		&reflectedFeature{"Color", reflect.ValueOf("white")},
-		&reflectedFeature{"Color", reflect.ValueOf("yellow")},
-		&reflectedFeature{"Weight", reflect.ValueOf("heavy")},
+		&reflectedFeature{"Color", "red"},
+		&reflectedFeature{"Color", "yellow"},
+		&reflectedFeature{"Weight", "heavy"},
 	}
 
 	stumper := NewDecisionStumper(features, dataset)

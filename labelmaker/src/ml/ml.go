@@ -1,6 +1,7 @@
 package ml
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 )
@@ -90,6 +91,17 @@ func NewDecisionStumper(fs []Feature, es []Example) *DecisionStumper {
 	return &DecisionStumper{labels, fs, es}
 }
 
+type key struct {
+	b bool
+	f Feature
+	l Label
+}
+
+func (k key) String() string {
+	return fmt.Sprintf("{%s %s: %v}", k.f, k.l, k.b)
+}
+
+
 func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionStump {
 	// See Boosting p. 314
 	// Pick a feature split that minimizes:
@@ -102,11 +114,6 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 	// split on one feature.
 
 	// Compute W_+^jl, W_-^jl
-	type key struct {
-		bool
-		Feature
-		Label
-	}
 	var w map[key]float64 = make(map[key]float64)
 	for _, feature := range stumper.features {
 		for label, _ := range stumper.labels {
@@ -125,6 +132,10 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 		}
 	}
 
+	for key, val := range w {
+		fmt.Printf("%v: %v\n", key, val)
+	}
+
 	// Find the feature that minimizes Z_t:
 	// TODO: Boosting sums over features in Z_t; should we be seleting the
 	// feature with the highest score here to minimize Z_t or the minimum?
@@ -137,6 +148,7 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 		for label, _ := range stumper.labels {
 			zFeature += math.Sqrt(w[key{true, feature, label}] * w[key{false, feature, label}])
 		}
+		fmt.Printf("%v Z=%f\n", feature, zFeature)
 		if zFeature < zMin {
 			fMin = feature
 			zMin = zFeature
@@ -150,6 +162,5 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 		c[label] = 0.5 * math.Log((1.0 + w[key{true, fMin, label}]) / (1.0 + w[key{false, fMin, label}]))
 	}
 
-	// FIXME: Return the distribution per label.
 	return &DecisionStump{fMin, c}
 }
