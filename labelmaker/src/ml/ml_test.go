@@ -54,7 +54,7 @@ func (d *datum) HasLabel(l Label) bool {
 func TestDecisionStump(t *testing.T) {
 	dist := map[Label]*Distribution{
 		"vehicle": UniformDistribution(4),
-		"fruit": UniformDistribution(4),
+		"fruit":   UniformDistribution(4),
 	}
 
 	dataset := []Example{

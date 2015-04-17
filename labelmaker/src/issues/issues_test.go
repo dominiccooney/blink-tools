@@ -17,7 +17,7 @@ func (xs Labels) equals(ys Labels) bool {
 }
 
 func (i Issue) equals(j Issue) bool {
-	return i.Id == j.Id && i.Title == j.Title && i.Content == j.Content && i.State == j.State && i.Status == j.Status && i.Labels.equals(j.Labels)
+	return i.Id == j.Id && i.Title == j.Title && i.Content == j.Content && i.State == j.State && i.Status == j.Status && i.IssueLabels.equals(j.IssueLabels)
 }
 
 func TestParseIssues(t *testing.T) {
@@ -79,8 +79,8 @@ func TestIssueParserEmptyLabels(t *testing.T) {
 	if 1 != len(issues) {
 		t.Errorf("expected to parse 1 issue but was %d", len(issues))
 	}
-	if nil != issues[0].Labels {
-		t.Errorf("expected the issue to have no labels but was %v", issues[0].Labels)
+	if nil != issues[0].IssueLabels {
+		t.Errorf("expected the issue to have no labels but was %v", issues[0].IssueLabels)
 	}
 }
 

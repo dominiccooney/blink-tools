@@ -49,19 +49,19 @@ const (
 	StatusArchived                  = "Archived"
 )
 
-// Labels is a set of string labels. Labels are an open taxonomy. Some
-// tools attach special meaning to specific labels. Some labels have
-// structure, for example, Cr-X-Y refers to the X component's Y
-// subcomponent.
+// IssueLabels is a set of string labels. Labels are an open
+// taxonomy. Some tools attach special meaning to specific
+// labels. Some labels have structure, for example, Cr-X-Y refers to
+// the X component's Y subcomponent.
 type Labels []string
 
 type Issue struct {
-	Id      int
-	Title   string
-	Content string
-	State   State
-	Status  Status
-	Labels  Labels
+	Id          int
+	Title       string
+	Content     string
+	State       State
+	Status      Status
+	IssueLabels Labels
 }
 
 func parseIssueDecodedJson(entry map[string]interface{}) (*Issue, error) {

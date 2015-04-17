@@ -29,7 +29,7 @@ func (dist *Distribution) P(i int) float64 {
 	if i == 0 {
 		return dist.Cumulative[0]
 	} else {
-		return dist.Cumulative[i] - dist.Cumulative[i - 1]
+		return dist.Cumulative[i] - dist.Cumulative[i-1]
 	}
 }
 
@@ -63,8 +63,8 @@ type Feature interface {
 }
 
 type DecisionStump struct {
-	Feature          Feature
-	c map[Label]float64
+	Feature Feature
+	c       map[Label]float64
 }
 
 func (d *DecisionStump) Predict(e Example, l Label) float64 {
@@ -100,7 +100,6 @@ type key struct {
 func (k key) String() string {
 	return fmt.Sprintf("{%s %s: %v}", k.f, k.l, k.b)
 }
-
 
 func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionStump {
 	// See Boosting p. 314
@@ -159,7 +158,7 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 	c := make(map[Label]float64)
 	for label, _ := range stumper.labels {
 		// 1.0+ is to avoid the case when either of these is 0.
-		c[label] = 0.5 * math.Log((1.0 + w[key{true, fMin, label}]) / (1.0 + w[key{false, fMin, label}]))
+		c[label] = 0.5 * math.Log((1.0+w[key{true, fMin, label}])/(1.0+w[key{false, fMin, label}]))
 	}
 
 	return &DecisionStump{fMin, c}
