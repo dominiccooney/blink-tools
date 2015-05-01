@@ -51,14 +51,17 @@ func (dist *CumulativeDistribution) Sample(r *rand.Rand) int {
 // C_i-1 < sample <= C_i
 func search(s float64, cumulative []float64, startInclusive int, endExclusive int) int {
 	if startInclusive == endExclusive {
-		if !(s <= cumulative[0] && (startInclusive == 0 || cumulative[startInclusive-1] < s)) {
+		if !((s <= cumulative[0] && startInclusive == 0) || cumulative[startInclusive-1] < s) {
 			panic("Search did not find a valid index. Is the cumulative distribution valid?")
 		}
 		return startInclusive
 	}
 	mid := startInclusive + (endExclusive-startInclusive)/2
-	if s < cumulative[mid] {
+	if s <= cumulative[mid] {
 		return search(s, cumulative, startInclusive, mid)
+	}
+	if mid == startInclusive {
+		mid++
 	}
 	return search(s, cumulative, mid, endExclusive)
 }

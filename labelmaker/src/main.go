@@ -57,9 +57,13 @@ func (t *titleFeature) String() string {
 	return fmt.Sprintf("title*%s", t.word)
 }
 
-func (t *titleFeature) Test(e ml.Example) bool {
+func (t *titleFeature) Predict(e ml.Example) float64 {
 	// TODO: Consider testing distinct words because of substring matches.
-	return strings.Contains(e.(*IssueExample).Title, t.word)
+	if strings.Contains(e.(*IssueExample).Title, t.word) {
+		return 1.0
+	} else {
+		return -1.0
+	}
 }
 
 type contentFeature struct {
@@ -70,9 +74,13 @@ func (f *contentFeature) String() string {
 	return f.word
 }
 
-func (f *contentFeature) Test(e ml.Example) bool {
+func (f *contentFeature) Predict(e ml.Example) float64 {
 	// TODO: Consider testing distinct words because of substring matches.
-	return strings.Contains(e.(*IssueExample).Content, f.word)
+	if strings.Contains(e.(*IssueExample).Content, f.word) {
+		return 1.0
+	} else {
+		return -1.0
+	}
 }
 
 func extractFeatures(examples []ml.Example) (features []ml.Feature) {
@@ -198,12 +206,12 @@ func main() {
 	fmt.Printf("%d features: %v, %v, %v, ...\n", len(features), features[0], features[1], features[2])
 
 	// Build a decision stump.
-	stumper := ml.NewDecisionStumper(features, dev)
-	booster := ml.NewAdaBoost(dev, stumper)
+	stumper := ml.NewDecisionStumper(features, dev, r)
+	booster := ml.NewAdaBoost(dev, stumper, r)
 
 	for i := 0; i < 1000; i++ {
-		booster.Round()
-		fmt.Printf("%d: dev=%f test=%f a=%f %v\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.A[i], booster.H[i].Feature)
+		booster.Round(1000)
+		fmt.Printf("%d: dev=%f test=%f a=%f\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.A[i])
 		debugDumpExampleWeights(booster)
 	}
 }
