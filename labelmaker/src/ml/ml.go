@@ -175,7 +175,7 @@ func (a *AdaBoost) Round() {
 	if h.e_t < 0.0 || h.e_t > 1.0 {
 		fmt.Printf("bad error: %f", h.e_t)
 	}
-	h.e_t = math.Max(h.e_t, 1.0e-10)
+	//h.e_t = math.Max(h.e_t, 1.0e-16)
 	a_t := 0.5 * math.Log((1-h.e_t)/h.e_t)
 	for i, example := range a.Examples {
 		a.D.P[i] *= math.Exp(-a_t * float64OfLabel(example.Label()) * h.Predict(example))

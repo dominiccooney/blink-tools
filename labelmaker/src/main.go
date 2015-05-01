@@ -62,11 +62,26 @@ func (t *titleFeature) Test(e ml.Example) bool {
 	return strings.Contains(e.(*IssueExample).Title, t.word)
 }
 
+type contentFeature struct {
+	word string
+}
+
+func (f *contentFeature) String() string {
+	return f.word
+}
+
+func (f *contentFeature) Test(e ml.Example) bool {
+	// TODO: Consider testing distinct words because of substring matches.
+	return strings.Contains(e.(*IssueExample).Content, f.word)
+}
+
 func extractFeatures(examples []ml.Example) (features []ml.Feature) {
 	features = nil
 
-	// Titles.
+	// FIXME: There's a lot of duplication here with how title and
+	// body are handled.
 	titleWords := make(map[string]int)
+	bodyWords := make(map[string]int)
 	for _, example := range examples {
 		issue := example.(*IssueExample)
 		for _, word := range strings.Split(issue.Title, " ") {
@@ -74,11 +89,24 @@ func extractFeatures(examples []ml.Example) (features []ml.Feature) {
 			n, _ := titleWords[word]
 			titleWords[word] = n + 1
 		}
+		for _, word := range strings.Split(issue.Content, " ") {
+			n, _ := bodyWords[word]
+			bodyWords[word] = n + 1
+		}
 	}
 	ninetyPercentExamples := int(0.9 * float64(len(examples)))
 	for word, count := range titleWords {
+		if word == "" {
+			continue
+		}
+
 		if 10 < count && count < ninetyPercentExamples {
 			features = append(features, &titleFeature{word})
+		}
+	}
+	for word, count := range bodyWords {
+		if 10 < count && count < ninetyPercentExamples {
+			features = append(features, &contentFeature{word})
 		}
 	}
 
