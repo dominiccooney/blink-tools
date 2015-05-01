@@ -94,18 +94,23 @@ func extractFeatures(examples []ml.Example) (features []ml.Feature) {
 			bodyWords[word] = n + 1
 		}
 	}
-	ninetyPercentExamples := int(0.9 * float64(len(examples)))
+	minExamples := int(0.1 * float64(len(examples)))
+	maxExamples := int(0.95 * float64(len(examples)))
 	for word, count := range titleWords {
 		if word == "" {
 			continue
 		}
 
-		if 10 < count && count < ninetyPercentExamples {
+		if minExamples <= count && count <= maxExamples {
 			features = append(features, &titleFeature{word})
 		}
 	}
 	for word, count := range bodyWords {
-		if 10 < count && count < ninetyPercentExamples {
+		if word == "" {
+			continue
+		}
+
+		if minExamples <= count && count <= maxExamples {
 			features = append(features, &contentFeature{word})
 		}
 	}
@@ -121,6 +126,20 @@ func debugCountLabelOccurrence(name string, set []ml.Example) {
 		}
 	}
 	fmt.Printf("%s: %d (%.2f)\n", name, n, float64(n) / float64(len(set)))
+}
+
+func debugDumpExampleWeights(a *ml.AdaBoost) {
+	var positives []float64
+	var negatives []float64
+	for i, example := range a.Examples {
+		if example.Label() {
+			positives = append(positives, a.D.P[i])
+		} else {
+			negatives = append(negatives, a.D.P[i])
+		}
+	}
+	ml.DebugCharacterizeWeights("+ve", positives)
+	ml.DebugCharacterizeWeights("-ve", negatives)
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write CPU profile to file")
@@ -171,8 +190,8 @@ func main() {
 	debugCountLabelOccurrence("test", test)
 
 	// TODO: Remove this. Shrunk to get profiling results.
-	//dev = dev[0:1000]
-	//test = test[0:1000]
+	dev = dev[0:1000]
+	test = test[0:1000]
 
 	// Build features.
 	features := extractFeatures(dev)
@@ -185,5 +204,6 @@ func main() {
 	for i := 0; i < 100; i++ {
 		booster.Round()
 		fmt.Printf("%d: dev=%f test=%f a=%f %v\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.A[i], booster.H[i].Feature)
+		debugDumpExampleWeights(booster)
 	}
 }

@@ -202,21 +202,37 @@ func (a *AdaBoost) Round() {
 	a.A = append(a.A, a_t)
 }
 
-func (a *AdaBoost) Predict(e Example) Label {
+func (a *AdaBoost) Predict(e Example) float64 {
 	sum := 0.0
 	for i, h := range a.H {
 		sum += a.A[i] * h.Predict(e)
 	}
-	return Label(sum >= 0)
+	return sum
+}
+
+func DebugCharacterizeWeights(name string, ws []float64) {
+	min := math.MaxFloat64
+	max := 1.0 - math.MaxFloat64
+	sum := 0.0
+	for _, w := range ws {
+		sum += w
+		min = math.Min(min, w)
+		max = math.Max(max, w)
+	}
+	fmt.Printf("%s: %d values, min=%f, mean=%f, max=%f\n", name, len(ws), min, sum / float64(len(ws)), max)
 }
 
 // Evaluates the classifier on a test set and returns the error rate.
 func (a *AdaBoost) Evaluate(test []Example) float64 {
+	var scores []float64
 	mispredictions := 0
 	for _, example := range test {
-		if a.Predict(example) != example.Label() {
+		score := a.Predict(example)
+		if Label(score > 0.0) != example.Label() {
 			mispredictions++
 		}
+		scores = append(scores, score)
 	}
+	DebugCharacterizeWeights("scores", scores)
 	return float64(mispredictions) / float64(len(test))
 }
