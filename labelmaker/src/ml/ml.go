@@ -77,6 +77,19 @@ type Feature interface {
 	Test(Example) bool
 }
 
+type andFeature struct {
+	f1 Feature
+	f2 Feature
+}
+
+func (f *andFeature) String() string {
+	return fmt.Sprintf("%s && %s", f.f1, f.f2)
+}
+
+func (f *andFeature) Test(e Example) bool {
+	return f.f1.Test(e) && f.f2.Test(e)
+}
+
 type FeatureNegater struct {
 	Feature Feature
 }
@@ -105,18 +118,22 @@ func (stump *DecisionStump) Predict(e Example) float64 {
 type DecisionStumper struct {
 	features []Feature
 	examples []Example
+	r *rand.Rand
 }
 
 func NewDecisionStumper(fs []Feature, es []Example) *DecisionStumper {
-	return &DecisionStumper{fs, es}
+	return &DecisionStumper{fs, es, rand.New(rand.NewSource(7))}
 }
 
 func (stumper *DecisionStumper) NewStump(ds *Distribution) *DecisionStump {
 	var bestStump *DecisionStump = nil
 
-	// FIXME: Separate stump creation and stump evaluation.
-	// Consider each feature as a potential stump.
-	for _, feature := range stumper.features {
+	// Consider random pairs of features as stumps.
+	for i := 0; i < 1000; i++ {
+		f1 := stumper.features[stumper.r.Intn(len(stumper.features))]
+		f2 := stumper.features[stumper.r.Intn(len(stumper.features))]
+		var feature Feature = &andFeature{f1, f2}
+
 		counts := make(map[bool]float64)
 		for i, example := range stumper.examples {
 			counts[feature.Test(example) == bool(example.Label())] += ds.P[i]
