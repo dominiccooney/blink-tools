@@ -94,8 +94,8 @@ func extractFeatures(examples []ml.Example) (features []ml.Feature) {
 			bodyWords[word] = n + 1
 		}
 	}
-	minExamples := int(0.1 * float64(len(examples)))
-	maxExamples := int(0.95 * float64(len(examples)))
+	minExamples := int(0.01 * float64(len(examples)))
+	maxExamples := int(0.50 * float64(len(examples)))
 	for word, count := range titleWords {
 		if word == "" {
 			continue
@@ -190,8 +190,8 @@ func main() {
 	debugCountLabelOccurrence("test", test)
 
 	// TODO: Remove this. Shrunk to get profiling results.
-	dev = dev[0:1000]
-	test = test[0:1000]
+	// dev = dev[0:1000]
+	// test = test[0:1000]
 
 	// Build features.
 	features := extractFeatures(dev)
@@ -201,7 +201,7 @@ func main() {
 	stumper := ml.NewDecisionStumper(features, dev)
 	booster := ml.NewAdaBoost(dev, stumper)
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 1000; i++ {
 		booster.Round()
 		fmt.Printf("%d: dev=%f test=%f a=%f %v\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.A[i], booster.H[i].Feature)
 		debugDumpExampleWeights(booster)

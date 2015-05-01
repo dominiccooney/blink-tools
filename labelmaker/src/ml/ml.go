@@ -151,11 +151,11 @@ func (stumper *DecisionStumper) NewStump(ds *Distribution) *DecisionStump {
 		stump := &DecisionStump{feature, counts[false]}
 
 		if bestStump == nil || stump.e_t < bestStump.e_t {
-			fmt.Printf("New best stump %f: \"%s\"\n", stump.e_t, stump.Feature)
 			bestStump = stump
 		}
 	}
 
+	fmt.Printf("Best stump %f: \"%s\"\n", bestStump.e_t, bestStump.Feature)
 	return bestStump
 }
 
