@@ -10,6 +10,10 @@ type Distribution struct {
 	P []float64
 }
 
+type CumulativeDistribution struct {
+	P []float64
+}
+
 // UniformDistribution returns a new, uniform distribution over nitems items.
 func UniformDistribution(nitems int) *Distribution {
 	distribution := make([]float64, nitems, nitems)
@@ -19,16 +23,30 @@ func UniformDistribution(nitems int) *Distribution {
 	return &Distribution{distribution}
 }
 
-// Sample draws a sample, weighted by a distribution, and returns the
-// index of the sample.
-func (dist *Distribution) Sample(r *rand.Rand) int {
+func (d *Distribution) Normalize() {
+	sum := 0.0
+	for _, v := range d.P {
+		sum += v
+	}
+	for i, _ := range d.P {
+		d.P[i] /= sum
+	}
+}
+
+func CumulativeDistributionOfDistribution(dist *Distribution) *CumulativeDistribution {
 	cumulative := make([]float64, len(dist.P), len(dist.P))
 	sum := 0.0
 	for i, p := range dist.P {
 		sum += p
 		cumulative[i] = sum
 	}
-	return search(r.Float64(), cumulative, 0, len(cumulative))
+	return &CumulativeDistribution{cumulative}
+}
+
+// Sample draws a sample, weighted by a distribution, and returns the
+// index of the sample.
+func (dist *CumulativeDistribution) Sample(r *rand.Rand) int {
+	return search(r.Float64(), dist.P, 0, len(dist.P))
 }
 
 // search does a binary search to find the index i such that:
@@ -47,11 +65,10 @@ func search(s float64, cumulative []float64, startInclusive int, endExclusive in
 	return search(s, cumulative, mid, endExclusive)
 }
 
-type Label string
+type Label bool
 
 type Example interface {
-	Labels() []Label
-	HasLabel(Label) bool
+	Label() Label
 }
 
 type Feature interface {
@@ -60,72 +77,61 @@ type Feature interface {
 	Test(Example) bool
 }
 
-type stumpProbabilityKey struct {
-	hasFeature bool
-	label Label
-	hasLabel bool
+type FeatureNegater struct {
+	Feature Feature
+}
+
+func (f *FeatureNegater) String() string {
+	return fmt.Sprintf("not(%s)", f.Feature)
+}
+
+func (f *FeatureNegater) Test(e Example) bool {
+	return !f.Feature.Test(e)
 }
 
 type DecisionStump struct {
 	Feature Feature
-	p map[stumpProbabilityKey]float64
-	e_t float64
+	e_t     float64
 }
 
-// Predict indicates whether e has label l.
-func (d *DecisionStump) Predict(e Example, l Label) bool {
-	return d.p[stumpProbabilityKey{d.Feature.Test(e), l, true}] > 0.5
+func (stump *DecisionStump) Predict(e Example) float64 {
+	if stump.Feature.Test(e) {
+		return 1.0
+	} else {
+		return -1.0
+	}
 }
 
 type DecisionStumper struct {
-	labels   map[Label]bool
 	features []Feature
 	examples []Example
 }
 
 func NewDecisionStumper(fs []Feature, es []Example) *DecisionStumper {
-	// Collect a set of all labels.
-	labels := make(map[Label]bool)
-	for _, e := range es {
-		for _, l := range e.Labels() {
-			labels[l] = true
-		}
-	}
-	return &DecisionStumper{labels, fs, es}
+	return &DecisionStumper{fs, es}
 }
 
-func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionStump {
+func (stumper *DecisionStumper) NewStump(ds *Distribution) *DecisionStump {
 	var bestStump *DecisionStump = nil
 
+	// FIXME: Separate stump creation and stump evaluation.
 	// Consider each feature as a potential stump.
 	for _, feature := range stumper.features {
-		counts := make(map[stumpProbabilityKey]float64)
+		counts := make(map[bool]float64)
 		for i, example := range stumper.examples {
-			b := feature.Test(example)
-			for label, _ := range stumper.labels {
-				counts[stumpProbabilityKey{b, label, example.HasLabel(label)}] += ds[label].P[i];
-			}
+			counts[feature.Test(example) == bool(example.Label())] += ds.P[i]
 		}
 
-		// Normalize probabilities.
-		for _, hasFeature := range []bool{false, true} {
-			for label, _ := range stumper.labels {
-				denom := counts[stumpProbabilityKey{hasFeature, label, false}] + counts[stumpProbabilityKey{hasFeature, label, true}]
-				counts[stumpProbabilityKey{hasFeature, label, false}] /= denom
-				counts[stumpProbabilityKey{hasFeature, label, true}] /= denom
-			}
+		denom := counts[true] + counts[false]
+		counts[true] /= denom
+		counts[false] /= denom
+
+		if counts[true] < counts[false] {
+			feature = &FeatureNegater{feature}
+			counts[true], counts[false] = counts[false], counts[true]
 		}
 
-		stump := &DecisionStump{feature, counts, 0.0}
-
-		// Calculate e_t, the Hamming loss splitting on feature:
-		for i, example := range stumper.examples {
-			for label, _ := range stumper.labels {
-				if example.HasLabel(label) != stump.Predict(example, label) {
-					stump.e_t += ds[label].P[i];
-				}
-			}
-		}
+		stump := &DecisionStump{feature, counts[false]}
 
 		if bestStump == nil || stump.e_t < bestStump.e_t {
 			fmt.Printf("New best stump %f: \"%s\"\n", stump.e_t, stump.Feature)
@@ -136,94 +142,64 @@ func (stumper *DecisionStumper) NewStump(ds map[Label]*Distribution) *DecisionSt
 	return bestStump
 }
 
-type AdaBoostMH struct {
+type AdaBoost struct {
 	Examples []Example
 	// TODO: Generalize DecisionStumper/DecisionStump to any base learner.
 	Stumper *DecisionStumper
-	D       map[Label]*Distribution
+	D       Distribution
 	H       []*DecisionStump
 	A       []float64
 }
 
-func NewAdaBoostMH(es []Example, learner *DecisionStumper) *AdaBoostMH {
-	dist := make(map[Label]*Distribution)
-	for label, _ := range learner.labels {
-		dist[label] = UniformDistribution(len(es))
-
-		// The probability distribution is normalized by
-		// number of labels.
-		for i := range dist[label].P {
-			dist[label].P[i] /= float64(len(learner.labels))
-		}
-	}
-	return &AdaBoostMH{
+func NewAdaBoost(es []Example, learner *DecisionStumper) *AdaBoost {
+	dist := UniformDistribution(len(es))
+	return &AdaBoost{
 		es,
 		learner,
-		dist,
+		*dist,
 		nil,
 		nil,
 	}
 }
 
-func hasLabel(e Example, l Label) float64 {
-	if e.HasLabel(l) {
+func float64OfLabel(label Label) float64 {
+	if label {
 		return 1.0
 	} else {
 		return -1.0
 	}
 }
 
-func predict(h *DecisionStump, e Example, l Label) float64 {
-	if h.Predict(e, l) {
-		return 1.0
-	} else {
-		return -1.0
-	}
-}
-
-func (a *AdaBoostMH) Round() {
-	h := a.Stumper.NewStump(a.D)
+func (a *AdaBoost) Round() {
+	h := a.Stumper.NewStump(&a.D)
 	if h.e_t < 0.0 || h.e_t > 1.0 {
 		fmt.Printf("bad error: %f", h.e_t)
 	}
-	a_t := 0.5 * math.Log((1 - h.e_t) / h.e_t)
-	scale := make([]float64, len(a.Examples), len(a.Examples))
-	sum := 0.0
-	for label, _ := range a.Stumper.labels {
-		for i, example := range a.Examples {
-			scale[i] = math.Exp(-a_t * hasLabel(example, label)*predict(h, example, label))
-			sum += scale[i]
-		}
+	h.e_t = math.Max(h.e_t, 1.0e-10)
+	a_t := 0.5 * math.Log((1-h.e_t)/h.e_t)
+	for i, example := range a.Examples {
+		a.D.P[i] *= math.Exp(-a_t * float64OfLabel(example.Label()) * h.Predict(example))
 	}
-	for label, _ := range a.Stumper.labels {
-		for i := range a.Examples {
-			a.D[label].P[i] *= scale[i] / sum
-		}
-	}
+	a.D.Normalize()
 	a.H = append(a.H, h)
 	a.A = append(a.A, a_t)
 }
 
-func (a *AdaBoostMH) Predict(e Example, l Label) float64 {
+func (a *AdaBoost) Predict(e Example) Label {
 	sum := 0.0
 	for i, h := range a.H {
-		sum += a.A[i] * predict(h, e, l)
+		sum += a.A[i] * h.Predict(e)
 	}
-	//fmt.Printf("%s %f %s\n", fmt.Sprintf("%s", e)[22:40], sum, l)
-	return sum
+	return Label(sum >= 0)
 }
 
-// Hamming distance; lower is better.
-func (a *AdaBoostMH) Evaluate(test []Example) int {
-	dist := 0
+// Evaluates the classifier on a test set and returns the error rate.
+func (a *AdaBoost) Evaluate(test []Example) float64 {
+	mispredictions := 0
 	for _, example := range test {
-		for label, _ := range a.Stumper.labels {
-			if a.Predict(example, label) > 0.0 && example.HasLabel(label) {
-				continue
-			}
-			dist++
+		if a.Predict(example) != example.Label() {
+			mispredictions++
 		}
 	}
-	// TODO: Maybe normalize this?
-	return dist
+	return float64(mispredictions) / float64(len(test))
 }

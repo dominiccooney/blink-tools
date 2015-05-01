@@ -8,8 +8,8 @@ func (xs Labels) equals(ys Labels) bool {
 	if len(xs) != len(ys) {
 		return false
 	}
-	for i := range xs {
-		if xs[i] != ys[i] {
+	for k, _ := range xs {
+		if _, ok := ys[k]; !ok {
 			return false
 		}
 	}
@@ -36,7 +36,7 @@ func TestParseIssues(t *testing.T) {
 		"The < content of the first issue",
 		StateClosed,
 		StatusWontFix,
-		[]string{"OS-Mac", "Pri-2", "Type-Bug", "OS-Linux", "clang"},
+		map[string]bool{"OS-Mac": true, "Pri-2": true, "Type-Bug": true, "OS-Linux": true, "clang": true},
 	}
 	if !expected.equals(*issues[0]) {
 		t.Errorf("expected the first issue to be %v but was %v", expected, *issues[0])

@@ -53,7 +53,7 @@ const (
 // taxonomy. Some tools attach special meaning to specific
 // labels. Some labels have structure, for example, Cr-X-Y refers to
 // the X component's Y subcomponent.
-type Labels []string
+type Labels map[string]bool
 
 type Issue struct {
 	Id          int
@@ -136,13 +136,13 @@ func (p *issueParser) status() Status {
 }
 
 func (p *issueParser) labels() Labels {
-	var ls []string = nil
+	ls := make(map[string]bool)
 	labelsJson := p.entry["issues$label"]
 	if labelsJson == nil {
 		return nil
 	}
 	for _, value := range labelsJson.([]interface{}) {
-		ls = append(ls, value.(map[string]interface{})["$t"].(string))
+		ls[value.(map[string]interface{})["$t"].(string)] = true
 	}
 	return ls
 }

@@ -9,7 +9,8 @@ import (
 
 func TestSamplerUnitaryDistribution(t *testing.T) {
 	d := UniformDistribution(1)
-	x := d.Sample(rand.New(rand.NewSource(0)))
+	c := CumulativeDistributionOfDistribution(d)
+	x := c.Sample(rand.New(rand.NewSource(0)))
 	if 0 != x {
 		t.Errorf("Sampling the unitary distribution should produce index 0, was %d", x)
 	}
@@ -43,25 +44,18 @@ func (d *datum) Weight() string {
 	return d.weight
 }
 
-func (d *datum) Labels() []Label {
-	return []Label{d.class}
-}
-
-func (d *datum) HasLabel(l Label) bool {
-	return d.class == l
+func (d *datum) Label() Label {
+	return d.class
 }
 
 func TestDecisionStump(t *testing.T) {
-	dist := map[Label]*Distribution{
-		"vehicle": UniformDistribution(4),
-		"fruit":   UniformDistribution(4),
-	}
+	dist := UniformDistribution(4)
 
 	dataset := []Example{
-		&datum{"red", "heavy", "vehicle"},
-		&datum{"red", "light", "fruit"},
-		&datum{"yellow", "light", "fruit"},
-		&datum{"yellow", "light", "vehicle"},
+		&datum{"red", "heavy", true},
+		&datum{"red", "light", false},
+		&datum{"yellow", "light", false},
+		&datum{"yellow", "light", true},
 	}
 
 	features := []Feature{
