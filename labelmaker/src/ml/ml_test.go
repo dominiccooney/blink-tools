@@ -25,9 +25,13 @@ func (r *reflectedFeature) String() string {
 	return fmt.Sprintf("%s*%v", r.name, r.value)
 }
 
-func (r *reflectedFeature) Test(e Example) bool {
+func (r *reflectedFeature) Predict(e Example) float64 {
 	val := reflect.ValueOf(e).MethodByName(r.name).Call(nil)[0].String()
-	return r.value == val
+	if r.value == val {
+		return 1.0
+	} else {
+		return -1.0
+	}
 }
 
 type datum struct {
@@ -49,8 +53,6 @@ func (d *datum) Label() Label {
 }
 
 func TestDecisionStump(t *testing.T) {
-	dist := UniformDistribution(4)
-
 	dataset := []Example{
 		&datum{"red", "heavy", true},
 		&datum{"red", "light", false},
@@ -64,9 +66,10 @@ func TestDecisionStump(t *testing.T) {
 		&reflectedFeature{"Weight", "heavy"},
 	}
 
-	stumper := NewDecisionStumper(features, dataset)
-	stump := stumper.NewStump(dist)
-	if stump.Feature != features[2] {
-		t.Errorf("expected decision stump to split on Weight*heavy but split on %v", stump.Feature)
+	r := rand.New(rand.NewSource(42))
+	stumper := NewDecisionStumper(features, dataset, r)
+	stump := stumper.NewClassifier(dataset)
+	if stump != features[2] {
+		t.Errorf("expected decision stump to split on Weight*heavy but split on %v", stump)
 	}
 }
