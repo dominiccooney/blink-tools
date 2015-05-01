@@ -190,8 +190,8 @@ func main() {
 	debugCountLabelOccurrence("test", test)
 
 	// TODO: Remove this. Shrunk to get profiling results.
-	// dev = dev[0:1000]
-	// test = test[0:1000]
+	dev = dev[0:1000]
+	test = test[0:1000]
 
 	// Build features.
 	features := extractFeatures(dev)
