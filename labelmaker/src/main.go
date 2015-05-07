@@ -16,8 +16,8 @@ import (
 	"strings"
 )
 
-func loadIssues() ([]*issues.Issue, error) {
-	corpus, err := filepath.Glob("closed-issues-with-cr-label-*.json")
+func loadIssues(glob string) ([]*issues.Issue, error) {
+	corpus, err := filepath.Glob(glob)
 	if err != nil {
 		return nil, err
 	}
@@ -151,6 +151,7 @@ func debugDumpExampleWeights(a *ml.AdaBoost) {
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write CPU profile to file")
+var dataset = flag.String("dataset", "small", "which dataset to use (small, large)")
 
 func main() {
 	flag.Parse()
@@ -164,7 +165,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	is, err := loadIssues()
+	is, err := loadIssues(fmt.Sprintf("../datasets/%s/closed-issues-with-cr-label-*.json", *dataset))
 	if err != nil {
 		panic(err)
 	}
