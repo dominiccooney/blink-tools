@@ -206,9 +206,11 @@ func main() {
 	features := extractFeatures(dev)
 	fmt.Printf("%d features: %v, %v, %v, ...\n", len(features), features[0], features[1], features[2])
 
-	// Build a decision stump.
-	stumper := ml.NewDecisionStumper(features, dev, r)
-	booster := ml.NewAdaBoost(dev, stumper, r)
+	// Build a decision tree.
+	// stumper := ml.NewDecisionStumper(features, dev, r)
+	maxDecisionTreeDepth := 4
+	treeBuilder := ml.NewDecisionTreeBuilder(features, maxDecisionTreeDepth)
+	booster := ml.NewAdaBoost(dev, treeBuilder, r)
 
 	for i := 0; i < 1000; i++ {
 		booster.Round(1000)
