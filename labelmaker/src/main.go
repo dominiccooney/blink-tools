@@ -196,6 +196,19 @@ func debugDumpExampleWeights(a *ml.AdaBoost) {
 	ml.DebugCharacterizeWeights("-ve", negatives)
 }
 
+func trimToBalanceClasses(r *rand.Rand, es []ml.Example) []ml.Example {
+	var xs []ml.Example
+	var ys []ml.Example
+	for i, e := range es {
+		if e.Label() {
+			xs = append(xs, e)
+		} else if r.Intn(i + 1) < len(xs) {
+			ys = append(ys, e)
+		}
+	}
+	return append(xs, ys...)
+}
+
 var cpuprofile = flag.String("cpuprofile", "", "write CPU profile to file")
 var dataset = flag.String("dataset", "small", "which dataset to use (small, large)")
 
@@ -247,6 +260,8 @@ func main() {
 	// TODO: Remove this. Shrunk to get profiling results.
 	//dev = dev[0:1000]
 	//test = test[0:1000]
+	dev = trimToBalanceClasses(r, dev)
+	debugCountLabelOccurrence("trimmed dev", dev)
 
 	// Build features.
 	features := extractFeatures(dev)
@@ -259,7 +274,7 @@ func main() {
 	booster := ml.NewAdaBoost(dev, treeBuilder, r)
 
 	for i := 0; i < 1000; i++ {
-		booster.Round(1000)
+		booster.Round(100)
 		fmt.Printf("%d: dev=%f test=%f a=%f\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.A[i])
 		debugDumpExampleWeights(booster)
 	}
