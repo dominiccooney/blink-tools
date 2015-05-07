@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"issues"
 	"log"
+	"math"
 	"math/rand"
 	"ml"
 	"os"
@@ -83,43 +84,69 @@ func (f *contentFeature) Predict(e ml.Example) float64 {
 	}
 }
 
+type stringer func (e ml.Example) string
+
+type bigram struct {
+	label string
+	f stringer
+	w1 string
+	w2 string
+}
+
+func (b *bigram) String() string {
+	return fmt.Sprintf("%s*(%s,%s)", b.label, b.w1, b.w2)
+}
+
+func (b *bigram) Predict(e ml.Example) float64 {
+	words := strings.Split(b.f(e), " ")
+	for i := 0; i < len(words) - 1; i++ {
+		if words[i] == b.w1 && words[i+1] == b.w2 {
+			return 1.0
+		}
+	}
+	return -1.0
+}
+
+func extractBigrams(label string, f stringer, e ml.Example) []ml.Feature {
+	words := strings.Split(f(e), " ")
+	grams := make([]ml.Feature, len(words)-1, len(words)-1)
+	for i := range grams {
+		grams[i] = &bigram{label, f, words[i], words[i+1]}
+	}
+	return grams
+}
+
 func extractFeatures(examples []ml.Example) (features []ml.Feature) {
 	features = nil
 
-	// FIXME: There's a lot of duplication here with how title and
-	// body are handled.
-	titleWords := make(map[string]int)
-	bodyWords := make(map[string]int)
+	var title stringer = func(e ml.Example) string {
+		return (e.(*IssueExample)).Title
+	}
+	var content stringer = func(e ml.Example) string {
+		return (e.(*IssueExample)).Content
+	}
+	bigrams := make(map[string]ml.Feature)
 	for _, example := range examples {
-		issue := example.(*IssueExample)
-		for _, word := range strings.Split(issue.Title, " ") {
-			// TODO: Consider lowercasing, cleaning, stemming.
-			n, _ := titleWords[word]
-			titleWords[word] = n + 1
+		for _, gram := range extractBigrams("title", title, example) {
+			bigrams[gram.String()] = gram
 		}
-		for _, word := range strings.Split(issue.Content, " ") {
-			n, _ := bodyWords[word]
-			bodyWords[word] = n + 1
+		for _, gram := range extractBigrams("content", content, example) {
+			bigrams[gram.String()] = gram
 		}
 	}
-	minExamples := int(0.01 * float64(len(examples)))
-	maxExamples := int(0.50 * float64(len(examples)))
-	for word, count := range titleWords {
-		if word == "" {
-			continue
+
+	minExamples := int(0.001 * float64(len(examples)))
+	maxExamples := int(0.95 * float64(len(examples)))
+	for _, gram := range bigrams {
+		count := 0
+		for _, example := range examples {
+			if !math.Signbit(gram.Predict(example)) {
+				count++
+			}
 		}
 
 		if minExamples <= count && count <= maxExamples {
-			features = append(features, &titleFeature{word})
-		}
-	}
-	for word, count := range bodyWords {
-		if word == "" {
-			continue
-		}
-
-		if minExamples <= count && count <= maxExamples {
-			features = append(features, &contentFeature{word})
+			features = append(features, gram)
 		}
 	}
 
@@ -199,8 +226,8 @@ func main() {
 	debugCountLabelOccurrence("test", test)
 
 	// TODO: Remove this. Shrunk to get profiling results.
-	dev = dev[0:1000]
-	test = test[0:1000]
+	//dev = dev[0:1000]
+	//test = test[0:1000]
 
 	// Build features.
 	features := extractFeatures(dev)
@@ -208,12 +235,12 @@ func main() {
 
 	// Build a decision tree.
 	// stumper := ml.NewDecisionStumper(features, dev, r)
-	maxDecisionTreeDepth := 4
+	maxDecisionTreeDepth := 5
 	treeBuilder := ml.NewDecisionTreeBuilder(features, maxDecisionTreeDepth)
 	booster := ml.NewAdaBoost(dev, treeBuilder, r)
 
 	for i := 0; i < 1000; i++ {
-		booster.Round(1000)
+		booster.Round(100)
 		fmt.Printf("%d: dev=%f test=%f a=%f\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.A[i])
 		debugDumpExampleWeights(booster)
 	}
