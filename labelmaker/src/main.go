@@ -41,8 +41,29 @@ func loadIssues(glob string) ([]*issues.Issue, error) {
 	return is, nil
 }
 
+type bigramKey string
+
+func makeBigramKey(w1 string, w2 string) bigramKey {
+	return bigramKey(fmt.Sprintf("%s,%s", w1, w2))
+}
+
 type IssueExample struct {
 	*issues.Issue
+	titleBigrams   map[bigramKey]bool
+	contentBigrams map[bigramKey]bool
+}
+
+func bigramHash(s string) map[bigramKey]bool {
+	m := make(map[bigramKey]bool)
+	words := strings.Split(s, " ")
+	for i := 0; i < len(words)-1; i++ {
+		m[makeBigramKey(words[i], words[i+1])] = true
+	}
+	return m
+}
+
+func NewIssueExample(i *issues.Issue) *IssueExample {
+	return &IssueExample{i, bigramHash(i.Title), bigramHash(i.Content)}
 }
 
 func (is *IssueExample) Label() ml.Label {
@@ -84,34 +105,32 @@ func (f *contentFeature) Predict(e ml.Example) float64 {
 	}
 }
 
-type stringer func (e ml.Example) string
+type bigrammer func(e ml.Example) map[bigramKey]bool
 
 type bigram struct {
 	label string
-	f stringer
-	w1 string
-	w2 string
+	f     bigrammer
+	pair  bigramKey
 }
 
 func (b *bigram) String() string {
-	return fmt.Sprintf("%s*(%s,%s)", b.label, b.w1, b.w2)
+	return fmt.Sprintf("%s*(%s)", b.label, b.pair)
 }
 
 func (b *bigram) Predict(e ml.Example) float64 {
-	words := strings.Split(b.f(e), " ")
-	for i := 0; i < len(words) - 1; i++ {
-		if words[i] == b.w1 && words[i+1] == b.w2 {
-			return 1.0
-		}
+	if _, ok := b.f(e)[b.pair]; ok {
+		return 1.0
 	}
 	return -1.0
 }
 
-func extractBigrams(label string, f stringer, e ml.Example) []ml.Feature {
-	words := strings.Split(f(e), " ")
-	grams := make([]ml.Feature, len(words)-1, len(words)-1)
-	for i := range grams {
-		grams[i] = &bigram{label, f, words[i], words[i+1]}
+func extractBigrams(label string, f bigrammer, e ml.Example) []ml.Feature {
+	bis := f(e)
+	grams := make([]ml.Feature, len(bis), len(bis))
+	i := 0
+	for b := range bis {
+		grams[i] = &bigram{label, f, b}
+		i++
 	}
 	return grams
 }
@@ -119,11 +138,11 @@ func extractBigrams(label string, f stringer, e ml.Example) []ml.Feature {
 func extractFeatures(examples []ml.Example) (features []ml.Feature) {
 	features = nil
 
-	var title stringer = func(e ml.Example) string {
-		return (e.(*IssueExample)).Title
+	var title bigrammer = func(e ml.Example) map[bigramKey]bool {
+		return (e.(*IssueExample)).titleBigrams
 	}
-	var content stringer = func(e ml.Example) string {
-		return (e.(*IssueExample)).Content
+	var content bigrammer = func(e ml.Example) map[bigramKey]bool {
+		return (e.(*IssueExample)).contentBigrams
 	}
 	bigrams := make(map[string]ml.Feature)
 	for _, example := range examples {
@@ -160,7 +179,7 @@ func debugCountLabelOccurrence(name string, set []ml.Example) {
 			n++
 		}
 	}
-	fmt.Printf("%s: %d (%.2f)\n", name, n, float64(n) / float64(len(set)))
+	fmt.Printf("%s: %d (%.2f)\n", name, n, float64(n)/float64(len(set)))
 }
 
 func debugDumpExampleWeights(a *ml.AdaBoost) {
@@ -208,14 +227,14 @@ func main() {
 		case 0:
 		case 1:
 		case 2:
-			test = append(test, &IssueExample{i})
+			test = append(test, NewIssueExample(i))
 			break
 		case 3:
 		case 4:
-			validation = append(validation, &IssueExample{i})
+			validation = append(validation, NewIssueExample(i))
 			break
 		default:
-			dev = append(dev, &IssueExample{i})
+			dev = append(dev, NewIssueExample(i))
 			break
 		}
 	}
@@ -240,7 +259,7 @@ func main() {
 	booster := ml.NewAdaBoost(dev, treeBuilder, r)
 
 	for i := 0; i < 1000; i++ {
-		booster.Round(100)
+		booster.Round(1000)
 		fmt.Printf("%d: dev=%f test=%f a=%f\n", i, booster.Evaluate(dev), booster.Evaluate(test), booster.A[i])
 		debugDumpExampleWeights(booster)
 	}
