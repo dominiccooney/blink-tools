@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<title>Bug Triage List</title>
+<!-- TODO: Use server-side transforms -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.13.3/react.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/0.13.3/JSXTransformer.js"></script>
+<body>
+<script type="text/jsx">
+'use strict';
+
+const maxResultsPerPage = 100;
+
+function formatIssuesUrl(opts, page, resultsPerPage) {
+  if (!/\d\d\d\d\/\d?\d\/\d?\d/.test(opts.openedAfter)) {
+    throw 'opts.openedAfter should match YYYY/mm/dd but is \"' +
+        opts.openedAfter + '"';
+  }
+  return 'https://code.google.com/feeds/issues/p/chromium/issues/full' +
+      '?alt=json&start-index=' + (page * resultsPerPage + 1) +
+      '&max-results=' + resultsPerPage +
+      '&q=status:untriaged+opened-after:' + opts.openedAfter +
+      '+cr=' + opts.label;
+}
+
+function fetchIssues(opts) {
+  var optsCopy = {
+    label: opts.label,
+    openedAfter: opts.openedAfter
+  };
+  var page = 0;
+  var issues = [];
+
+  function fetchPage() {
+    try {
+      var url = formatIssuesUrl(optsCopy, page, maxResultsPerPage);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+    return fetch(url)
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(json) {
+        if (!json.feed.entry) {
+          return issues;
+        }
+        issues.push.apply(issues, json.feed.entry);
+        page++;
+        return fetchPage();
+      });
+  }
+
+  return fetchPage();
+}
+
+var Issue = React.createClass({
+  render: function() {
+    return (
+      <tr>
+        <td>
+          <a href={this.props.href} target="_blank">{this.props.number}</a>
+        </td>
+        <td>{this.props.title}</td>
+      </tr>
+    );
+  }
+});
+
+var IssueList = React.createClass({
+  getInitialState: function() {
+    return {issues: []}
+  },
+  componentDidMount: function() {
+    this.propsChanging(this.props);
+  },
+  componentWillReceiveProps: function(nextProps) {
+    console.log(nextProps);
+    if (this.sameProps(nextProps)) {
+      console.log('bail out');
+      return;
+    }
+    this.propsChanging(nextProps);
+  },
+  sameProps: function(otherProps) {
+    return otherProps.label == this.props.label &&
+        otherProps.openedAfter == this.props.openedAfter;
+  },
+  propsChanging: function(nextProps) {
+    if (!nextProps.label) {
+      this.setState({issues: []});
+      return;
+    }
+    fetchIssues({label: nextProps.label, openedAfter: nextProps.openedAfter})
+      .then(function(issues) {
+        console.log('got data');
+        if (!this.sameProps(nextProps)) {
+          console.log('bail out');
+          return; // This must be the response to a stale request.
+        }
+        this.setState({issues: issues});
+      }.bind(this));
+  },
+  render: function() {
+    var issueNodes = this.state.issues.map(function(issue) {
+      var id = issue.issues$id.$t;
+
+      var url;
+      issue.link.some(function(link) {
+        if (link.rel == 'alternate' && link.type == 'text/html') {
+          url = link.href;
+          return true;
+        }
+      });
+
+      return (
+        <Issue
+          key={id}
+          number={id}
+          title={issue.title.$t}
+          href={url}
+          />
+      );
+    });
+    return (
+      <table className="issueList">
+        {issueNodes}
+      </table>
+    );
+  }
+});
+
+var LabelSwitcher = React.createClass({
+  render: function() {
+    var labels = this.props.labels.map(function(label) {
+      return (
+        <div key={label}>
+          <a href="javascript:"
+            label={label}
+            onClick={this.select.bind(this, label)}
+            >
+           {this.props.selected == label ? '*' : ''}
+           {label}
+          </a>
+        </div>
+      );
+    }, this);
+    return (
+      <div>{labels}</div>
+    );
+  },
+  select: function(label) {
+    this.props.delegate.select(label);
+  }
+});
+
+var App = React.createClass({
+  getInitialState: function() {
+    var oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    return {date: oneWeekAgo};
+  },
+  render: function() {
+    return (
+      <div>
+        Since:
+        <input
+          type="date"
+          defaultValue={this.dateStringForInput()}
+          onChange={this.dateChanged}/>
+        <LabelSwitcher
+          labels={['Blink-DOM', 'Blink-HTML', 'Blink-XML']}
+          delegate={this}
+          selected={this.state.selected}/>
+        {this.state.selected
+          ? <IssueList
+              label={this.state.selected}
+              openedAfter={this.dateStringForIssues()} />
+          : <div/>}
+      </div>
+    );
+  },
+  select: function(label) { this.setState({selected: label}); },
+  dateStringForInput: function() {
+    return this.state.date.toISOString().split('T')[0];
+  },
+  dateStringForIssues: function() {
+    return this.dateStringForInput().replace(/-/g, '/');
+  },
+  dateChanged: function(event) {
+    this.setState({date: new Date(event.target.value)});
+  }
+});
+
+React.render(<App />, document.body);
+</script>
