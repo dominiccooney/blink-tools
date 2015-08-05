@@ -67,7 +67,7 @@ var Issue = React.createClass({
 
 var IssueList = React.createClass({
   getInitialState: function() {
-    return {issues: []}
+    return {issues: [], loading: false}
   },
   componentDidMount: function() {
     this.propsChanging(this.props);
@@ -86,9 +86,10 @@ var IssueList = React.createClass({
   },
   propsChanging: function(nextProps) {
     if (!nextProps.label) {
-      this.setState({issues: []});
+      this.setState({issues: [], loading: false});
       return;
     }
+    this.setState({issues: this.state.issues, loading: true});
     fetchIssues({label: nextProps.label, openedAfter: nextProps.openedAfter})
       .then(function(issues) {
         console.log('got data');
@@ -96,10 +97,26 @@ var IssueList = React.createClass({
           console.log('bail out');
           return; // This must be the response to a stale request.
         }
-        this.setState({issues: issues});
+        this.setState({issues: issues, loading: false});
       }.bind(this));
   },
   render: function() {
+    if (this.state.loading) {
+      return (
+        <span>
+         &#8987; Please wait...
+        </span>
+      );
+    }
+
+    if (!this.state.issues.length) {
+      return (
+        <span>
+          &#127880; No issues! &#127880;
+        </span>
+      );
+    }
+
     var issueNodes = this.state.issues.map(function(issue) {
       var id = issue.issues$id.$t;
 
