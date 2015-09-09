@@ -4,6 +4,12 @@
 ; functions in paragraph.el heavily, so consider customizing variables
 ; like SENTENCE-END-DOUBLE-SPACE and so on.
 
+;; TODO:
+;; - Add a way to iterate by paragraph, by sentence, by bigram, etc.
+;; - Add a way to iterate noun phrases, etc.
+;; - Add something for structural composition and checks (maybe based on
+;;   org-mode?)
+
 (require 'cl)
 
 (defgroup dd-faces nil
@@ -23,7 +29,7 @@
   "State tracking what's currently being revised.")
 
 (defstruct dd-session
-  "The target of revisions. It is necessary to keep track of these"
+  "The target of revisions."
   window
   buffer
   overlay)
@@ -32,7 +38,9 @@
   "Starts a new session.
 If there is an existing session in DD-CURRENT-SESSION, deletes its overlay."
   (if dd-current-session
-      (delete-overlay (dd-session-overlay dd-current-session)))
+      (let ((overlay (dd-session-overlay dd-current-session)))
+        (if (overlayp overlay)
+            (delete-overlay overlay))))
   (setq dd-current-session (make-dd-session :buffer (current-buffer)
                                             :window (selected-window))))
 
@@ -40,6 +48,15 @@ If there is an existing session in DD-CURRENT-SESSION, deletes its overlay."
   "Selects the window and buffer of SESSION."
   (select-window (dd-session-window session))
   (set-buffer (dd-session-buffer session)))
+
+;; Rules.
+
+(defstruct dd-rule
+  "A writing rule.
+DETECTOR searches the current buffer to see where the rule can be applied.
+PROMPT is displayed when the detector matches."
+  detector
+  prompt)
 
 ;; Prompts.
 
@@ -74,6 +91,119 @@ DD-PROMPT-PART defines how parts are handled."
          (fill-paragraph))
         ((listp part)
          (mapcar 'dd-prompt-part part))))
+
+;; Things from "Line by Line."
+
+(defun dd-lbl-cite (page)
+  "Generates a string citation of Line by Line.
+PAGE is the page to cite."
+  (concat "Cook, Claire Kehrwald (1985) Line by Line (p. "
+          (number-to-string page) ") Boston, MA: Houghton Mifflin Harcourt."))
+
+(defvar dd-rule-lbl-general-consensus
+  (make-dd-rule
+   :detector "general consensus"
+   :prompt `("Since consensus means \"general agreement\" it is redundant
+to write \"general consensus\". Just use \"consensus.\"\n\n"
+             ,(dd-prompt-paragraph (dd-lbl-cite 180)))))
+
+;; Things from "Plain Words."
+
+(defun dd-pw-cite (page)
+  "Generates a string citation of Gowers' Plain Words.
+PAGE is the page to cite."
+  (concat "Gowers, Earnest & Gowers, Rebecca (2015) Plain Words (p. "
+          (number-to-string page) ") UK: Penguin Books."))
+
+(defvar dd-rule-pw-and-which
+  (make-dd-rule
+   :detector "\\(and\\|but\\|or\\)\\W+\\(which\\|who\\|where\\)"
+   :prompt `("It is wrong to write:
+
+and which, and who, and where, but which, or which
+
+except by way of introducing a second relative clause with the
+same antecedent as the one that just preceded it.\n\n"
+   ,(dd-prompt-paragraph (dd-pw-cite 176)))))
+
+;; Things from "The Pyramid Principle."
+
+(defun dd-tpp-cite (page)
+  "Generates a string citation of The Pyramid Principle.
+PAGE is the page to cite."
+  (concat "Minto, Barbara (2009) The Pyramid Principle (3rd ed. revised. p. "
+          (number-to-string page) ") Essex, UK: Pearson Education."))
+
+(defun dd-tpp-build-pyramid (&optional button)
+  "The process from Chapter 3, \"How to build a Pyramid Structure.\""
+  (interactive)
+  (dd-new-session)
+  (dd-prompt
+   (make-dd-prompt-button :text "Next" :action #'dd-tpp-build-pyramid-step-2)
+   "\n\n"
+   "Fill in the \"top box\":
+
+1. What Subject are you discussing?
+
+2. What Question are you answering in the reader's mind?
+
+3. What is the Answer?\n\n"
+   (dd-prompt-paragraph (dd-tpp-cite 26))))
+
+(defun dd-tpp-build-pyramid-step-2 (button)
+  (dd-prompt
+   (make-dd-prompt-button :text "Prev" :action #'dd-tpp-build-pyramid)
+   " "
+   (make-dd-prompt-button :text "Next" :action #'dd-tpp-build-pyramid-step-3)
+   "\n\n"
+   "Match the Answer to the Introduction:
+
+4. What is the Situation?
+
+   Make the first non-controversial statement you can make about
+   the Subject.
+
+5. What is the Complication?
+
+   Ask yourself, \"So what?\" Think of something in the Situation
+   to raise the Question.
+
+6. Do the Question and Answer still follow?
+
+   Change the Question to the one raised by the Complication, or
+   use a different Complication."))
+
+(defun dd-tpp-build-pyramid-step-3 (button)
+  (dd-prompt
+   (make-dd-prompt-button :text "Prev" :action #'dd-tpp-build-pyramid-step-2)
+   " "
+   (make-dd-prompt-button :text "Next" :action #'dd-tpp-build-pyramid-step-4)
+   "\n\n"
+   "Aside: Situation, Complication, Solution order:
+
+You can vary the order of these parts to affect a change in tone.
+
+CONSIDERED: Situation, Complication, Solution
+DIRECT: Solution, Situation, Complication
+CONCERNED: Complication, Situation, Solution\n\n"
+   (dd-prompt-paragraph (dd-tpp-cite 44))))
+
+;; TODO: After this step, work through Ch. 7 for checking groupings.
+(defun dd-tpp-build-pyramid-step-4 (button)
+  (dd-prompt
+   (make-dd-prompt-button :text "Prev" :action #'dd-tpp-build-pyramid-step-3)
+   " "
+   (make-dd-prompt-button :text "Next" :action #'dd-done)
+   "\n\n"
+   "Find the Key Line:
+
+7. What new Question is raised by the Answer?
+
+   The Key Line not only gives the answer to the Question, but
+   indicates the plan of the document.
+
+8. Will you answer inductively or deductively?
+   If inductively, what is your plural noun?"))
 
 ;; Things from "Technical Writing and Professional Communication."
 
@@ -224,6 +354,52 @@ This resets the restriction."
   (narrow-to-region (point) (mark))
   (deactivate-mark)
   (dd-twpc-procedure))
+
+(defvar dd-rules
+  (list
+   dd-rule-lbl-general-consensus
+   dd-rule-pw-and-which))
+
+(defun dd-revise-by-rules ()
+  "Interactively revises based on word-level rules."
+  (interactive)
+  (dd-new-session)
+  (with-current-buffer (dd-session-buffer dd-current-session)
+    (let ((overlay (make-overlay (point) (point))))
+      (setf (dd-session-overlay dd-current-session) overlay)
+      (overlay-put overlay 'face 'dd-primary-face)))
+  (dd-revise-by-rules-next nil))
+
+(defun dd-revise-by-rules-next (button)
+  (let (next-rule start end)
+    ;; Find the rule that triggers closest.
+    (with-current-buffer (dd-session-buffer dd-current-session)
+      (setf start (point-max))
+      (dolist (rule dd-rules)
+        (save-excursion
+          (if (and (search-forward-regexp (dd-rule-detector rule) nil t)
+                   (< (match-beginning 0) start))
+              (setf next-rule rule
+                    start (match-beginning 0)
+                    end (match-end 0))))))
+    (if next-rule
+        (progn
+          (with-current-buffer (dd-session-buffer dd-current-session)
+            ;; Highlight the match.
+            (move-overlay (dd-session-overlay dd-current-session) start end)
+            ;; Set the mark and move to the start of the match.
+            (set-mark end)
+            (goto-char start))
+          ;; Show the prompt.
+          ;; TODO: Have some facility to skip rules. This just keeps revising
+          ;; from point.
+          (apply #'dd-prompt
+                 (cons (make-dd-prompt-button
+                        :text "Next"
+                        :action #'dd-revise-by-rules-next)
+                       (cons "\n\n"
+                             (dd-rule-prompt next-rule)))))
+      (dd-done nil))))
 
 (defvar dd-mode
   nil
