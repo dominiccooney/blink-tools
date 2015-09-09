@@ -107,6 +107,19 @@ PAGE is the page to cite."
 to write \"general consensus\". Just use \"consensus.\"\n\n"
              ,(dd-prompt-paragraph (dd-lbl-cite 180)))))
 
+(defvar dd-rule-lbl-while
+  (make-dd-rule
+   :detector "while\\W"
+   :prompt `(
+"\"while\" seems ludicrous when it is meant as \"although\" or
+\"whereas\" but contradicts the notion of simultaneity:
+
+(Avoid) \"While our ancestors took months to cross the continent,
+we do it in five hours.\"
+
+Consider \"although\".\n\n"
+    ,(dd-prompt-paragraph (dd-lbl-cite 202)))))
+
 ;; Things from "Plain Words."
 
 (defun dd-pw-cite (page)
@@ -188,12 +201,11 @@ DIRECT: Solution, Situation, Complication
 CONCERNED: Complication, Situation, Solution\n\n"
    (dd-prompt-paragraph (dd-tpp-cite 44))))
 
-;; TODO: After this step, work through Ch. 7 for checking groupings.
 (defun dd-tpp-build-pyramid-step-4 (button)
   (dd-prompt
    (make-dd-prompt-button :text "Prev" :action #'dd-tpp-build-pyramid-step-3)
    " "
-   (make-dd-prompt-button :text "Next" :action #'dd-done)
+   (make-dd-prompt-button :text "Next" :action #'dd-tpp-check-order)
    "\n\n"
    "Find the Key Line:
 
@@ -204,6 +216,34 @@ CONCERNED: Complication, Situation, Solution\n\n"
 
 8. Will you answer inductively or deductively?
    If inductively, what is your plural noun?"))
+
+(defun dd-tpp-check-order (&optional button)
+  (dd-prompt
+   (make-dd-prompt-button :text "Prev" :action #'dd-tpp-build-pyramid-step-4)
+   " "
+   (make-dd-prompt-button :text "Next" :action #'dd-done)
+   "\n\n"
+   "If the group is inductive, it must either deal with cause and
+effect and should be ordered by time; or divide a whole into its
+parts and be ordered by structure; or classify like things and be
+ordered by rank.
+
+Time order: Ask yourself, \"What would I do first if I were doing
+this? What second? etc.\"
+
+Structural: Are the pieces mutually exclusive and collectively
+exhaustive (MECE) in terms of the whole? How do you order the
+pieces? To reflect a process, use time order; to emphasize
+location, use structural order (for example, geography);
+otherwise rank them (by whatever is relevant--size, priority,
+etc.)
+
+Ranking: What do you label the points as? (What is the \"group
+noun\"?) Can you find anything more specifically the same about
+them? Can you justify their order on that basis? Are there any
+missing?\n\n"
+   (dd-prompt-paragraph (dd-tpp-cite 91))))
+   
 
 ;; Things from "Technical Writing and Professional Communication."
 
@@ -358,6 +398,7 @@ This resets the restriction."
 (defvar dd-rules
   (list
    dd-rule-lbl-general-consensus
+   dd-rule-lbl-while
    dd-rule-pw-and-which))
 
 (defun dd-revise-by-rules ()
@@ -387,8 +428,7 @@ This resets the restriction."
           (with-current-buffer (dd-session-buffer dd-current-session)
             ;; Highlight the match.
             (move-overlay (dd-session-overlay dd-current-session) start end)
-            ;; Set the mark and move to the start of the match.
-            (set-mark end)
+            ;; Move to the start of the match.
             (goto-char start))
           ;; Show the prompt.
           ;; TODO: Have some facility to skip rules. This just keeps revising
