@@ -8,8 +8,10 @@
 'use strict';
 
 const maxResultsPerPage = 100;
+const statusUnconfirmed = 'unconfirmed';
+const statusUntriaged = 'untriaged';
 
-function formatIssuesUrl(opts, page, resultsPerPage) {
+function formatIssuesUrl(opts, page, status, resultsPerPage) {
   if (!/\d\d\d\d\/\d?\d\/\d?\d/.test(opts.openedAfter)) {
     throw 'opts.openedAfter should match YYYY/mm/dd but is \"' +
         opts.openedAfter + '"';
@@ -17,8 +19,12 @@ function formatIssuesUrl(opts, page, resultsPerPage) {
   return 'https://code.google.com/feeds/issues/p/chromium/issues/full' +
       '?alt=json&start-index=' + (page * resultsPerPage + 1) +
       '&max-results=' + resultsPerPage +
-      '&q=status:untriaged+opened-after:' + opts.openedAfter +
+      '&q=status:' + status + '+opened-after:' + opts.openedAfter +
       '+cr=' + opts.label;
+}
+
+function issueId(issue) {
+  return Number(issue.issues$id.$t);
 }
 
 function fetchIssues(opts) {
@@ -29,9 +35,9 @@ function fetchIssues(opts) {
   var page = 0;
   var issues = [];
 
-  function fetchPage() {
+  function fetchPage(status) {
     try {
-      var url = formatIssuesUrl(optsCopy, page, maxResultsPerPage);
+      var url = formatIssuesUrl(optsCopy, page, status, maxResultsPerPage);
     } catch (e) {
       return Promise.reject(e);
     }
@@ -41,7 +47,7 @@ function fetchIssues(opts) {
       })
       .then(function(json) {
         if (!json.feed.entry) {
-          return issues;
+          return;
         }
         issues.push.apply(issues, json.feed.entry);
         page++;
@@ -49,7 +55,14 @@ function fetchIssues(opts) {
       });
   }
 
-  return fetchPage();
+  return Promise.all([
+      fetchPage(statusUntriaged),
+      fetchPage(statusUnconfirmed)
+    ])
+    .then(() => {
+      issues.sort((a, b) => { issueId(a) - issueId(b) });
+      return issues;
+    });
 }
 
 var Issue = React.createClass({
@@ -118,7 +131,7 @@ var IssueList = React.createClass({
     }
 
     var issueNodes = this.state.issues.map(function(issue) {
-      var id = issue.issues$id.$t;
+      var id = issueId(issue);
 
       var url;
       issue.link.some(function(link) {
@@ -184,7 +197,9 @@ var App = React.createClass({
           defaultValue={this.dateStringForInput()}
           onChange={this.dateChanged}/>
         <LabelSwitcher
-          labels={['Blink-DOM', 'Blink-HTML', 'Blink-XML']}
+          labels={['Blink-DOM', 'Blink-HTML', 'Blink-XML', 'Blink',
+                   'Blink-Editing', 'Blink-Focus', 'Blink-Forms',
+                   'Blink-TextSelection', 'Blink-WebComponents']}
           delegate={this}
           selected={this.state.selected}/>
         {this.state.selected
