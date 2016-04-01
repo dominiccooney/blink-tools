@@ -15,6 +15,8 @@ import subprocess
 # - Add the experimental remote named 'wip'.
 # - Clone git://git.gnome.org/libxslt somewhere.
 # - Update config below to explain where everything is.
+# - On OS X, install these MacPorts:
+#   autoconf automake libtool pkgconfig
 #
 # Procedure:
 #
@@ -63,7 +65,8 @@ def git(*args):
   subprocess.check_call(command, shell=(os.name=='nt'))
 
 def sed_in_place(input_filename, program):
-  subprocess.check_call(['sed', '-i', program, input_filename])
+  # OS X's sed requires -e
+  subprocess.check_call(['sed', '-i', '-e', program, input_filename])
 
 def roll_libxslt_linux(config):
   files_to_preserve = ['OWNERS', 'README.chromium', 'BUILD.gn', 'libxslt.gyp']
@@ -101,11 +104,11 @@ def roll_libxslt_linux(config):
 
   # First run autogen in the root directory to generate configure for
   # use on OS X later.
-  subprocess.check_call(['./autogen.sh', '--help'])
+#  subprocess.check_call(['./autogen.sh', '--help'])
 
   os.mkdir('linux')
   os.chdir('linux')
-  subprocess.check_call(['../configure'] + configure_options +
+  subprocess.check_call(['../autogen.sh'] + configure_options +
                         ['--with-libxml-src=../../libxml/linux/'])
   sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
 
@@ -193,9 +196,11 @@ def roll_libxslt_osx(config):
   os.chdir(os.path.join(config[src_path_osx], third_party_libxslt))
   destructive_fetch_experimental_branch(config)
   # Run the configure script
-  os.chmod('configure', os.stat('configure').st_mode | stat.S_IEXEC)
+  subprocess.check_call(['autoreconf', '-i'])
+  os.chmod('configure', os.stat('configure').st_mode | stat.S_IXUSR)
+  # /linux here is not a typo; configure looks here to find xml2-config
   subprocess.check_call(['./configure'] + configure_options +
-                        ['--with-libxml-src=../libxml/mac/'])
+                        ['--with-libxml-src=../libxml/linux/'])
   # Clean up and emplace the file
   sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
   os.mkdir('mac')
@@ -204,7 +209,7 @@ def roll_libxslt_osx(config):
   git('add', 'mac/config.h')
   git('commit', '-m', 'OS X')
   git('push', 'wip', 'HEAD:%s' % config[wip_ref])
-  #git('clean', '-f')
+  git('clean', '-f')
 
 def get_out_of_jail(config, which):
   os.chdir(config[which])
