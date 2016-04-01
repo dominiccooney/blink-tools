@@ -2,20 +2,43 @@
 
 import os
 import shutil
+import stat
 import subprocess
 
-# Warning: This process is destructive and just gives up on failure.
+# Warning: This process is destructive and just gives up on
+# failure. Some amount of examining line numbers on failure is
+# expected.
 #
 # Prerequisites:
 #
 # - Check out Chromium somewhere on Linux, OS X and Windows.
 # - Add the experimental remote named 'wip'.
-# - Check out git://git.gnome.org/libxslt somewhere.
+# - Clone git://git.gnome.org/libxslt somewhere.
+# - Update config below to explain where everything is.
+#
+# Procedure:
+#
+# 1. On Linux, run roll.lgo()
+# 2. On Windows, run roll.wgo()
+# 3. On OS X, run roll.ogo()
+# 4. On Linux, run roll.lgo2()
+# 5. Check the try jobs pass (git cl try-results).
+# 6. Update the README.chromium file with notes.
+# 7. Complete code review, commit queue, etc. as normal.
+#
+# Troubleshooting:
+#
+# - Examine individual git commits to identify which step caused problems.
+# - Run roll.[lwo]uhoh() to reset your local git repo and try again.
 
 third_party_libxslt = 'third_party/libxslt'
 
+configure_options = ['--without-debug', '--without-mem-debug',
+                     '--without-debugger', '--without-plugins']
+
 libxslt_path = 'libxslt_path'
 src_path_linux = 'src_path_linux'
+src_path_osx = 'src_path_osx'
 src_path_windows = 'src_path_windows'
 wip_ref = 'wip_ref'
 
@@ -26,6 +49,7 @@ config = {
 
   # Where you store Chromium source, up to and including src
   src_path_linux: '/work/cb/src',
+  src_path_osx: '/Users/dpc/ca/src',
   src_path_windows: r'C:\src\ca\src',
 
   # The ref of the Experimental Branch to push intermediate steps to,
@@ -77,17 +101,18 @@ def roll_libxslt_linux(config):
 
   # First run autogen in the root directory to generate configure for
   # use on OS X later.
-  subprocess.check_call(['./autogen.sh'])
-  subprocess.check_call(['make', 'distclean'])
+  subprocess.check_call(['./autogen.sh', '--help']))
 
   os.mkdir('linux')
   os.chdir('linux')
-  subprocess.check_call(['../autogen.sh', '--without-debug',
-                         '--without-mem-debug', '--without-debugger',
-                         '--without-plugins',
-                         '--with-libxml-src=../../libxml/linux/'])
+  subprocess.check_call(['../configure'] + configure_options +
+                        ['--with-libxml-src=../../libxml/linux/'])
   sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
+
   # Other platforms share this, even though it is generated on Linux.
+  # Android and Windows do not have xlocale.
+  sed_in_place('libxslt/xsltconfig.h',
+               '/Locale support/,/#if 1/s/#if 1/#if 0/')
   shutil.move('libxslt/xsltconfig.h', '../libxslt')
 
   # Add *everything* and push it to the cloud for configuring on OS X, Windows
@@ -96,11 +121,9 @@ def roll_libxslt_linux(config):
   git('commit', '-m', '%s linux' % commit)
   git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
 
-  print('Now run steps on Windows, then OS X.')
+  print('Now run steps on Windows, then OS X, then back here.')
   # TODO: Consider hanging here and watch the repository and resume
   # the process automatically.
-
-# TODO: Implement roll_libxslt_osx
 
 # This continues the roll on Linux after Windows and OS X are done.
 def roll_libxslt_linux_2(config):
@@ -143,12 +166,14 @@ def roll_libxslt_linux_2(config):
   git('cl', 'upload', '-t', commit_message, '-m', commit_message)
   git('cl', 'try')
 
-def roll_libxslt_windows(config):
+def destructive_fetch_experimental_branch(config):
   # Fetch the in-progress roll from the experimental branch.
-  os.chdir(config[src_path_windows])
   git('fetch', 'wip', config[wip_ref])
   git('reset', '--hard', 'FETCH_HEAD')
 
+def roll_libxslt_windows(config):
+  os.chdir(config[src_path_windows])
+  destructive_fetch_experimental_branch(config)
   # Run the configure script.
   os.chdir(os.path.join(third_party_libxslt, 'win32'))
   subprocess.check_call([
@@ -164,6 +189,23 @@ def roll_libxslt_windows(config):
   git('push', 'wip', 'HEAD:%s' % config[wip_ref])
   git('clean', '-f')
 
+def roll_libxslt_osx(config):
+  os.chdir(os.path.join(config[src_path_osx], third_party_libxslt))
+  destructive_fetch_experimental_branch(config)
+  # Run the configure script
+  os.chmod('configure', os.stat('configure').st_mode | stat.S_IEXEC)
+  subprocess.check_call(['./configure'] + configure_options +
+                        ['--with-libxml-src=../libxml/mac/'])
+  # Clean up and emplace the file
+  sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
+  os.mkdir('mac')
+  shutil.move('config.h', 'mac')
+  # Commit and upload the result
+  git('add', 'mac/config.h')
+  git('commit', '-m', 'OS X')
+  git('push', 'wip', 'HEAD:%s' % config[wip_ref])
+  #git('clean', '-f')
+
 def get_out_of_jail(config, which):
   os.chdir(config[which])
   git('reset', '--hard', 'origin/master')
@@ -177,6 +219,12 @@ def lgo2():
 
 def luhoh():
   get_out_of_jail(config, src_path_linux)
+
+def ogo():
+  roll_libxslt_osx(config)
+
+def ouhoh():
+  get_out_of_jail(config, src_path_osx)
 
 def wgo():
   roll_libxslt_windows(config)
