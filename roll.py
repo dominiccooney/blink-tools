@@ -159,9 +159,10 @@ def roll_libxslt_windows(config):
   # Add, commit and push the result.
   os.chdir(os.path.join(config[src_path_windows], third_party_libxslt))
   shutil.move('config.h', 'win32')
-  git('add', '*')
+  git('add', 'win32/config.h')
   git('commit', '-m', 'Windows')
   git('push', 'wip', 'HEAD:%s' % config[wip_ref])
+  git('clean', '-f')
 
 def get_out_of_jail(config, which):
   os.chdir(config[which])
