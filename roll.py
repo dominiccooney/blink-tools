@@ -123,6 +123,7 @@ def roll_libxslt_linux_2(config):
     'linux/xslt-config',
     'xslt-config.in',
     # These are not needed.
+    'autom4te.cache',
     'doc',
     'python',
     'tests',
