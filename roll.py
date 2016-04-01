@@ -8,7 +8,7 @@ import subprocess
 #
 # Prerequisites:
 #
-# - Check out Chromium somewhere on Linux, Mac and Windows.
+# - Check out Chromium somewhere on Linux, OS X and Windows.
 # - Add the experimental remote named 'wip'.
 # - Check out git://git.gnome.org/libxslt somewhere.
 
@@ -43,10 +43,6 @@ def sed_in_place(input_filename, program):
 
 def roll_libxslt_linux(config):
   files_to_preserve = ['OWNERS', 'README.chromium', 'BUILD.gn']
-
-  full_path_to_third_party_libxslt = os.path.join(config[src_path_linux],
-                                                  third_party_libxslt)
-
   os.chdir(config[src_path_linux])
 
   # Nuke the old third_party/libxslt from orbit.
@@ -64,6 +60,8 @@ def roll_libxslt_linux(config):
   git('remote', 'update', 'origin')
   commit = subprocess.check_output(['git', 'log', '-n', '1',
                                     '--pretty=format:%H', 'origin/master'])
+  full_path_to_third_party_libxslt = os.path.join(config[src_path_linux],
+                                                  third_party_libxslt)
   subprocess.check_call(('git archive origin/master | tar -x -C "%s"' %
                          full_path_to_third_party_libxslt),
                         shell=True)
@@ -78,7 +76,7 @@ def roll_libxslt_linux(config):
                r's/GetFileAttributes\b/GetFileAttributesA/g')
 
   # First run autogen in the root directory to generate configure for
-  # use on Mac later.
+  # use on OS X later.
   subprocess.check_call(['./autogen.sh'])
   subprocess.check_call(['make', 'distclean'])
 
@@ -92,15 +90,50 @@ def roll_libxslt_linux(config):
   # Other platforms share this, even though it is generated on Linux.
   shutil.move('libxslt/xsltconfig.h', '../libxslt')
 
-  # Add *everything* and push it to the cloud for configuring on Mac, Windows
+  # Add *everything* and push it to the cloud for configuring on OS X, Windows
   os.chdir(full_path_to_third_party_libxslt)
   git('add', '*')
   git('commit', '-m', '%s linux' % commit)
   git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
 
-  print('Now run steps on Windows.')
-  # TODO: pull files back from Windows
-  # TODO: shutil.rmtree unwanted files from libxslt
+  print('Now run steps on Windows, then OS X.')
+  # TODO: Consider hanging here and watch the repository and resume
+  # the process automatically.
+
+# TODO: Implement roll_libxslt_osx
+
+# This continues the roll on Linux after Windows and OS X are done.
+def roll_libxslt_linux_2(config):
+  full_path_to_third_party_libxslt = os.path.join(config[src_path_linux],
+                                                  third_party_libxslt)
+  os.chdir(full_path_to_third_party_libxslt)
+  git('pull', 'wip', config[wip_ref])
+  commit = subprocess.check_output(['awk', '/Version:/ {print $2}',
+                                    'README.chromium'])
+  files_to_remove = [
+    # TODO: Excluding ChangeLog and NEWS because encoding problems mean
+    # bots can't patch these. Reinclude them when there is a consistent
+    # encoding.
+    'NEWS',
+    'ChangeLog',
+    # These have shebang but not executable bit; presubmit will barf on them.
+    'autogen.sh',
+    'linux/config.status',
+    'linux/libtool',
+    'linux/xslt-config',
+    'xslt-config.in',
+    # These are not needed.
+    'doc',
+    'examples',
+    'python',
+    'tests',
+    'vms'
+  ]
+  git('rm', '-rf', *files_to_remove)
+  git('commit', '-m', 'Remove unused files.')
+  commit_message = 'Roll libxslt to %s' % commit
+  git('cl', 'upload', '-t', commit_message, '-m', commit_message)
+  git('cl', 'try')
 
 def roll_libxslt_windows(config):
   # Fetch the in-progress roll from the experimental branch.
@@ -128,6 +161,9 @@ def get_out_of_jail(config, which):
 
 def lgo():
   roll_libxslt_linux(config)
+
+def lgo2():
+  roll_libxslt_linux_2(config)
 
 def luhoh():
   get_out_of_jail(config, src_path_linux)
