@@ -101,7 +101,7 @@ def roll_libxslt_linux(config):
 
   # First run autogen in the root directory to generate configure for
   # use on OS X later.
-  subprocess.check_call(['./autogen.sh', '--help']))
+  subprocess.check_call(['./autogen.sh', '--help'])
 
   os.mkdir('linux')
   os.chdir('linux')
