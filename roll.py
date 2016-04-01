@@ -42,7 +42,7 @@ def sed_in_place(input_filename, program):
   subprocess.check_call(['sed', '-i', program, input_filename])
 
 def roll_libxslt_linux(config):
-  files_to_preserve = ['OWNERS', 'README.chromium', 'BUILD.gn']
+  files_to_preserve = ['OWNERS', 'README.chromium', 'BUILD.gn', 'libxslt.gyp']
   os.chdir(config[src_path_linux])
 
   # Nuke the old third_party/libxslt from orbit.
@@ -124,9 +124,16 @@ def roll_libxslt_linux_2(config):
     'xslt-config.in',
     # These are not needed.
     'doc',
-    'examples',
     'python',
     'tests',
+    'xsltproc',
+    'linux/doc',
+    'linux/python',
+    'linux/tests',
+    'linux/xsltproc',
+    'linux/libexslt/.deps',
+    'linux/libxslt/.deps',
+    'examples',
     'vms'
   ]
   git('rm', '-rf', *files_to_remove)
