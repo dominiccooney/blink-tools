@@ -167,6 +167,7 @@ def roll_libxslt_windows(config):
 def get_out_of_jail(config, which):
   os.chdir(config[which])
   git('reset', '--hard', 'origin/master')
+  git('clean', '-f')
 
 def lgo():
   roll_libxslt_linux(config)
