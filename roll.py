@@ -284,7 +284,14 @@ def roll_libxml_windows(config):
   pass
 
 def roll_libxml_osx(config):
-  pass
+  os.chdir(os.path.join(config[src_path_osx], third_party_libxml_src,
+                        '../mac'))
+  destructive_fetch_experimental_branch(config)
+  subprocess.check_call(['autoreconf', '-i', '../src'])
+  subprocess.check_call(['../src/configure'] + xml_configure_options)
+  sed_in_place('config.h', 's/#define HAVE_RAND_R 1//')
+  git('commit', '-am', 'libxml, mac')
+  git('push', 'wip', 'HEAD:%s' % config[wip_ref])
 
 def luhoh():
   get_out_of_jail(config, src_path_linux)
