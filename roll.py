@@ -13,8 +13,12 @@ import subprocess
 #
 # - Check out Chromium somewhere on Linux, OS X and Windows.
 # - Add the experimental remote named 'wip'.
-# - Clone git://git.gnome.org/libxslt somewhere.
-# - Update config below to explain where everything is.
+# - XML
+# -- Clone git://git.gnome.org/libxml2
+# -- Update config below to explain where everything is.
+# - XSLT
+# -- Clone git://git.gnome.org/libxslt somewhere.
+# -- Update config below to explain where everything is.
 # - On OS X, install these MacPorts:
 #   autoconf automake libtool pkgconfig
 #
@@ -33,11 +37,15 @@ import subprocess
 # - Examine individual git commits to identify which step caused problems.
 # - Run roll.[lwo]uhoh() to reset your local git repo and try again.
 
+third_party_libxml_src = 'third_party/libxml/src'
 third_party_libxslt = 'third_party/libxslt'
 
-configure_options = ['--without-debug', '--without-mem-debug',
-                     '--without-debugger', '--without-plugins']
+xml_configure_options = ['--without-iconv', '--with-icu', '--without-ftp',
+                         '--without-http', '--without-lzma']
+xslt_configure_options = ['--without-debug', '--without-mem-debug',
+                          '--without-debugger', '--without-plugins']
 
+libxml_path = 'libxml_path'
 libxslt_path = 'libxslt_path'
 src_path_linux = 'src_path_linux'
 src_path_osx = 'src_path_osx'
@@ -47,16 +55,19 @@ wip_ref = 'wip_ref'
 # Dominic's default setup.
 config = {
   # Where you have git checkout git://git.gnome.org/libxslt
-  libxslt_path: '/work/xml/libxslt',
+  libxml_path: '/usr/local/google/work/xml/libxml2',
+
+  # Where you have git checkout git://git.gnome.org/libxslt
+  libxslt_path: '/usr/local/google/work/xml/libxslt',
 
   # Where you store Chromium source, up to and including src
-  src_path_linux: '/work/cb/src',
+  src_path_linux: '/usr/local/google/work/cb/src',
   src_path_osx: '/Users/dpc/ca/src',
   src_path_windows: r'C:\src\ca\src',
 
   # The ref of the Experimental Branch to push intermediate steps to,
   # to copy files between platforms.
-  wip_ref: 'refs/wip/dominicc/autoroll-libxslt'
+  wip_ref: 'refs/wip/dominicc/autoroll-xml-thing'
 }
 
 def git(*args):
@@ -68,32 +79,49 @@ def sed_in_place(input_filename, program):
   # OS X's sed requires -e
   subprocess.check_call(['sed', '-i', '-e', program, input_filename])
 
-def roll_libxslt_linux(config):
-  files_to_preserve = ['OWNERS', 'README.chromium', 'BUILD.gn', 'libxslt.gyp']
-  os.chdir(config[src_path_linux])
+def destructive_fetch_experimental_branch(config):
+  # Fetch the in-progress roll from the experimental branch.
+  git('fetch', 'wip', config[wip_ref])
+  git('reset', '--hard', 'FETCH_HEAD')
 
-  # Nuke the old third_party/libxslt from orbit.
-  git('rm', '-rf', third_party_libxslt)
-  shutil.rmtree(third_party_libxslt)
-  os.mkdir(third_party_libxslt)
+def get_out_of_jail(config, which):
+  os.chdir(config[which])
+  git('reset', '--hard', 'origin/master')
+  git('clean', '-f')
+
+def nuke_preserving(third_party_path, files_to_preserve):
+  git('rm', '-rf', third_party_path)
+  shutil.rmtree(third_party_path)
+  os.mkdir(third_party_path)
   files_to_preserve_with_paths = map(
-    lambda s: os.path.join(third_party_libxslt, s),
+    lambda s: os.path.join(third_party_path, s),
     files_to_preserve)
   git('reset', '--', *files_to_preserve_with_paths)
   git('checkout', '--', *files_to_preserve_with_paths)
 
-  # Update the libxslt repo and export it to the Chromium tree
-  os.chdir(config[libxslt_path])
+def export_to_chromium_chdir(remote_repo_path, full_third_party_path):
+  os.chdir(remote_repo_path)
   git('remote', 'update', 'origin')
   commit = subprocess.check_output(['git', 'log', '-n', '1',
                                     '--pretty=format:%H', 'origin/master'])
-  full_path_to_third_party_libxslt = os.path.join(config[src_path_linux],
-                                                  third_party_libxslt)
   subprocess.check_call(('git archive origin/master | tar -x -C "%s"' %
                          full_path_to_third_party_libxslt),
                         shell=True)
   os.chdir(full_path_to_third_party_libxslt)
   os.remove('.gitignore')
+  return commit
+
+def roll_libxslt_linux(config):
+  os.chdir(config[src_path_linux])
+
+  files_to_preserve = ['OWNERS', 'README.chromium', 'BUILD.gn', 'libxslt.gyp']
+  nuke_preserving(third_party_libxslt, files_to_preserve)
+
+  # Update the libxslt repo and export it to the Chromium tree
+  full_path_to_third_party_libxslt = os.path.join(config[src_path_linux],
+                                                  third_party_libxslt)
+  commit = export_to_chromium_chdir(config[libxslt_path],
+                                    full_path_to_third_party_libxslt)
 
   # Write the commit ID into the README.chromium file
   sed_in_place('README.chromium', 's/Version: .*$/Version: %s/' % commit)
@@ -108,7 +136,7 @@ def roll_libxslt_linux(config):
 
   os.mkdir('linux')
   os.chdir('linux')
-  subprocess.check_call(['../autogen.sh'] + configure_options +
+  subprocess.check_call(['../autogen.sh'] + libxslt_configure_options +
                         ['--with-libxml-src=../../libxml/linux/'])
   sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
 
@@ -121,7 +149,7 @@ def roll_libxslt_linux(config):
   # Add *everything* and push it to the cloud for configuring on OS X, Windows
   os.chdir(full_path_to_third_party_libxslt)
   git('add', '*')
-  git('commit', '-m', '%s linux' % commit)
+  git('commit', '-m', '%s libxslt, linux' % commit)
   git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
 
   print('Now run steps on Windows, then OS X, then back here.')
@@ -169,11 +197,6 @@ def roll_libxslt_linux_2(config):
   git('cl', 'upload', '-t', commit_message, '-m', commit_message)
   git('cl', 'try')
 
-def destructive_fetch_experimental_branch(config):
-  # Fetch the in-progress roll from the experimental branch.
-  git('fetch', 'wip', config[wip_ref])
-  git('reset', '--hard', 'FETCH_HEAD')
-
 def roll_libxslt_windows(config):
   os.chdir(config[src_path_windows])
   destructive_fetch_experimental_branch(config)
@@ -199,7 +222,7 @@ def roll_libxslt_osx(config):
   subprocess.check_call(['autoreconf', '-i'])
   os.chmod('configure', os.stat('configure').st_mode | stat.S_IXUSR)
   # /linux here is not a typo; configure looks here to find xml2-config
-  subprocess.check_call(['./configure'] + configure_options +
+  subprocess.check_call(['./configure'] + libxslt_configure_options +
                         ['--with-libxml-src=../libxml/linux/'])
   # Clean up and emplace the file
   sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
@@ -211,28 +234,74 @@ def roll_libxslt_osx(config):
   git('push', 'wip', 'HEAD:%s' % config[wip_ref])
   git('clean', '-f')
 
-def get_out_of_jail(config, which):
-  os.chdir(config[which])
-  git('reset', '--hard', 'origin/master')
-  git('clean', '-f')
+def roll_libxml_linux(config):
+  os.chdir(config[src_path_linux])
 
-def lgo():
-  roll_libxslt_linux(config)
+  # Nuke the old libxml from orbit; this ensures only desired cruft accumulates
+  nuke_preserving(third_party_libxml_src, [])
+  # Update the libxml repo and export it to the Chromium tree
+  full_path_to_third_party_libxml_src = os.path.join(config[src_path_linux],
+                                                     third_party_libxml_src)
+  commit = export_to_chromium_chdir(config[libxml_path],
+                                    full_path_to_third_party_libxml_src)
+  # Put the version number is the README file
+  sed_in_place('../README.chromium', 's/Version: .*$/Version: %s/' % commit)
 
-def lgo2():
-  roll_libxslt_linux_2(config)
+  # printf format specifiers
+  git('cherry-pick', 'd31995076e55f1aac2f935c53b585a90ece27a11')
+  # crbug.com/595262
+  git('cherry-pick', '27a27edb43e42023db7d154dcd9f66a500296cc1')
+  # crbug.com/599427
+  subprocess.check_call(['patch', 'xmlstring.c',
+                         os.path.join(__file__, 'roll-cr599427.txt')])
+  # crbug.com/602280
+  git('cherry-pick', 'bc5dfe3dbb61e497438849dbe909520128f5bbac')
+
+  os.mkdir('../linux')
+  os.chdir('../linux')
+  subprocess.check_call(['../src/autogen.sh'] + libxml_configure_options)
+  sed_in_place('config.h', 's/#define HAVE_RAND_R 1//')
+
+  # Add *everything* and push it to the cloud for configuring on OS X, Windows
+  os.chdir('../src')
+  git('add', '*')
+  git('commit', '-m', '%s libxml, linux' % commit)
+  git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
+
+  print('Now run steps on Windows, then OS X, then back here.')
+
+def roll_libxml_windows(config):
+  pass
+
+def roll_libxml_osx(config):
+  pass
 
 def luhoh():
   get_out_of_jail(config, src_path_linux)
 
-def ogo():
-  roll_libxslt_osx(config)
+def xml_lgo():
+  roll_libxml_linux(config)
+
+def xslt_lgo():
+  roll_libxslt_linux(config)
+
+def xslt_lgo2():
+  roll_libxslt_linux_2(config)
 
 def ouhoh():
   get_out_of_jail(config, src_path_osx)
 
-def wgo():
-  roll_libxslt_windows(config)
+def xml_ogo():
+  roll_libxml_osx(config)
+
+def xslt_ogo():
+  roll_libxslt_osx(config)
 
 def wuhoh():
   get_out_of_jail(config, src_path_windows)
+
+def xml_wgo():
+  roll_libxml_windows(config)
+
+def xslt_wgo():
+  roll_libxslt_windows(config)
