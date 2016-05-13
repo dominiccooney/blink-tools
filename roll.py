@@ -91,7 +91,7 @@ def get_out_of_jail(config, which):
 
 def nuke_preserving(third_party_path, files_to_preserve):
   git('rm', '-rf', third_party_path)
-  shutil.rmtree(third_party_path)
+  shutil.rmtree(third_party_path, ignore_errors=True)
   os.mkdir(third_party_path)
   files_to_preserve_with_paths = map(
     lambda s: os.path.join(third_party_path, s),
@@ -105,9 +105,9 @@ def export_to_chromium_chdir(remote_repo_path, full_third_party_path):
   commit = subprocess.check_output(['git', 'log', '-n', '1',
                                     '--pretty=format:%H', 'origin/master'])
   subprocess.check_call(('git archive origin/master | tar -x -C "%s"' %
-                         full_path_to_third_party_libxslt),
+                         full_third_party_path),
                         shell=True)
-  os.chdir(full_path_to_third_party_libxslt)
+  os.chdir(full_third_party_path)
   os.remove('.gitignore')
   return commit
 
@@ -136,7 +136,7 @@ def roll_libxslt_linux(config):
 
   os.mkdir('linux')
   os.chdir('linux')
-  subprocess.check_call(['../autogen.sh'] + libxslt_configure_options +
+  subprocess.check_call(['../autogen.sh'] + xslt_configure_options +
                         ['--with-libxml-src=../../libxml/linux/'])
   sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
 
@@ -222,7 +222,7 @@ def roll_libxslt_osx(config):
   subprocess.check_call(['autoreconf', '-i'])
   os.chmod('configure', os.stat('configure').st_mode | stat.S_IXUSR)
   # /linux here is not a typo; configure looks here to find xml2-config
-  subprocess.check_call(['./configure'] + libxslt_configure_options +
+  subprocess.check_call(['./configure'] + xslt_configure_options +
                         ['--with-libxml-src=../libxml/linux/'])
   # Clean up and emplace the file
   sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
@@ -234,7 +234,19 @@ def roll_libxslt_osx(config):
   git('push', 'wip', 'HEAD:%s' % config[wip_ref])
   git('clean', '-f')
 
+# Does something like cherry-pick, but against edited files.
+def cherry_pick_patch(commit, filename):
+  command = (r"""git format-patch -1 --stdout %(commit)s | """
+             r"""awk '/---.*\/%(filename)s/,/--$/ {print}' | patch""" %
+             {'commit': commit, 'filename': filename})
+  subprocess.check_call(command, shell=True)
+
 def roll_libxml_linux(config):
+  # Need to snarf this file path before changing dirs
+  # TODO(dominicc): This is no longer necessary in Python 3.4.1?
+  patch_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            'roll-cr599427.txt')
+
   os.chdir(config[src_path_linux])
 
   # Nuke the old libxml from orbit; this ensures only desired cruft accumulates
@@ -248,18 +260,16 @@ def roll_libxml_linux(config):
   sed_in_place('../README.chromium', 's/Version: .*$/Version: %s/' % commit)
 
   # printf format specifiers
-  git('cherry-pick', 'd31995076e55f1aac2f935c53b585a90ece27a11')
+  cherry_pick_patch('d31995076e55f1aac2f935c53b585a90ece27a11', 'timsort.h')
   # crbug.com/595262
-  git('cherry-pick', '27a27edb43e42023db7d154dcd9f66a500296cc1')
+  cherry_pick_patch('27a27edb43e42023db7d154dcd9f66a500296cc1', 'parser.c')
   # crbug.com/599427
-  subprocess.check_call(['patch', 'xmlstring.c',
-                         os.path.join(__file__, 'roll-cr599427.txt')])
+  subprocess.check_call(['patch', 'xmlstring.c', patch_file])
   # crbug.com/602280
-  git('cherry-pick', 'bc5dfe3dbb61e497438849dbe909520128f5bbac')
+  cherry_pick_patch('bc5dfe3dbb61e497438849dbe909520128f5bbac', 'uri.c')
 
-  os.mkdir('../linux')
   os.chdir('../linux')
-  subprocess.check_call(['../src/autogen.sh'] + libxml_configure_options)
+  subprocess.check_call(['../src/autogen.sh'] + xml_configure_options)
   sed_in_place('config.h', 's/#define HAVE_RAND_R 1//')
 
   # Add *everything* and push it to the cloud for configuring on OS X, Windows
