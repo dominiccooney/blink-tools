@@ -275,7 +275,7 @@ def roll_libxml_linux(config):
   # Add *everything* and push it to the cloud for configuring on OS X, Windows
   os.chdir('../src')
   git('add', '*')
-  git('commit', '-m', '%s libxml, linux' % commit)
+  git('commit', '-am', '%s libxml, linux' % commit)
   git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
 
   print('Now run steps on Windows, then OS X, then back here.')
