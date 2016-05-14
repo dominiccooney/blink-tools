@@ -335,9 +335,9 @@ def roll_libxml_windows(config):
   # ])
 
   # Add, commit and push the result.
-  shutil.move('VC10/config.h', '../../win32/config.h')
-  git('add', '../../win32/config.h')
-  shutil.move('include/libxml/xmlversion.h', '../../win32/xmlversion.h')
+#  shutil.move('VC10/config.h', '../../win32/config.h')
+#  git('add', '../../win32/config.h')
+  shutil.move('../include/libxml/xmlversion.h', '../../win32/xmlversion.h')
   git('add', '../../win32/xmlversion.h')
   git('commit', '-m', 'Windows')
   git('push', 'wip', 'HEAD:%s' % config[wip_ref])
