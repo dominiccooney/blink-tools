@@ -280,8 +280,67 @@ def roll_libxml_linux(config):
 
   print('Now run steps on Windows, then OS X, then back here.')
 
+# This continues the roll on Linux after Windows and OS X are done.
+def roll_libxml_linux_2(config):
+  full_path_to_third_party_libxml = os.path.join(config[src_path_linux],
+                                                 third_party_libxml_src, '..')
+  os.chdir(full_path_to_third_party_libxml)
+  git('pull', 'wip', config[wip_ref])
+  commit = subprocess.check_output(['awk', '/Version:/ {print $2}',
+                                    'README.chromium'])
+  sed_in_place('win32/config.h', """s/#define snprintf _snprintf/#if _MSC_VER < 1900
+#define snprintf _snprintf
+#endif/""")
+  files_to_remove = [
+    'HACKING',
+    'INSTALL.libxml2',
+    'MAINTAINERS',
+    'Makefile.win',
+    'src/autogen.sh',
+    'src/autom4te.cache',
+    'src/build_glob.py',
+    'src/chinvalid.def',
+    'src/doc',
+    'src/example',
+    'src/include/libxml/xmlwin32version.h',
+    'src/include/libxml/xmlwin32version.h.in',
+    'src/libxml2.doap',
+    'src/macos/libxml2.mcp.xml.sit.hqx',
+    'src/optim',
+    'src/os400',
+    'src/python',
+    'src/result',
+    'src/test',
+    'src/vms',
+    'src/win32/wince',
+    'src/VxWorks',
+    'src/xmlcatalog.c',
+    'src/xmllint.c',
+  ]
+  git('rm', '-rf', *files_to_remove)
+  git('commit', '-m', 'Remove unused files.')
+  commit_message = 'Roll libxml to %s' % commit
+  git('cl', 'upload', '-t', commit_message, '-m', commit_message)
+  git('cl', 'try')
+
 def roll_libxml_windows(config):
-  pass
+  os.chdir(config[src_path_windows])
+  destructive_fetch_experimental_branch(config)
+  # Run the configure script.
+  os.chdir(os.path.join(third_party_libxml_src, 'win32'))
+  subprocess.check_call([
+    'cscript', '//E:jscript', 'configure.js', 'compiler=msvc', 'iconv=no',
+    'icu=yes', 'ftp=no', 'http=no'
+  ])
+
+  # Add, commit and push the result.
+  shutil.move('VC10/config.h', '../../win32')
+  git('add', '../../win32/config.h')
+  shutil.move('include/libxml/xmlversion.h', '../../win32')
+  git('add', '../../win32/xmlversion.h')
+  git('commit', '-m', 'Windows')
+  git('push', 'wip', 'HEAD:%s' % config[wip_ref])
+  git('clean', '-f')
 
 def roll_libxml_osx(config):
   os.chdir(os.path.join(config[src_path_osx], third_party_libxml_src,
@@ -298,6 +357,9 @@ def luhoh():
 
 def xml_lgo():
   roll_libxml_linux(config)
+
+def xml_lgo2():
+  roll_libxml_linux_2(config)
 
 def xslt_lgo():
   roll_libxslt_linux(config)
