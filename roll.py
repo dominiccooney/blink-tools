@@ -289,18 +289,15 @@ def roll_libxml_linux_2(config):
   git('pull', 'wip', config[wip_ref])
   commit = subprocess.check_output(['awk', '/Version:/ {print $2}',
                                     'README.chromium'])
-  sed_in_place('win32/config.h', """s/#define snprintf _snprintf/#if _MSC_VER < 1900
-#define snprintf _snprintf
-#endif/""")
   files_to_remove = [
-    'HACKING',
-    'INSTALL.libxml2',
-    'MAINTAINERS',
-    'Makefile.win',
+    'src/HACKING',
+    'src/INSTALL.libxml2',
+    'src/MAINTAINERS',
+    'src/Makefile.win',
     'src/autogen.sh',
     'src/autom4te.cache',
     'src/build_glob.py',
-    'src/chinvalid.def',
+    'src/chvalid.def',
     'src/doc',
     'src/example',
     'src/include/libxml/xmlwin32version.h',
@@ -317,6 +314,7 @@ def roll_libxml_linux_2(config):
     'src/VxWorks',
     'src/xmlcatalog.c',
     'src/xmllint.c',
+    'src/xstc',
   ]
   git('rm', '-rf', *files_to_remove)
   git('commit', '-m', 'Remove unused files.')
