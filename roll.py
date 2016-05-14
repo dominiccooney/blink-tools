@@ -325,19 +325,19 @@ def roll_libxml_linux_2(config):
   git('cl', 'try')
 
 def roll_libxml_windows(config):
-  os.chdir(config[src_path_windows])
-  destructive_fetch_experimental_branch(config)
-  # Run the configure script.
-  os.chdir(os.path.join(third_party_libxml_src, 'win32'))
-  subprocess.check_call([
-    'cscript', '//E:jscript', 'configure.js', 'compiler=msvc', 'iconv=no',
-    'icu=yes', 'ftp=no', 'http=no'
-  ])
+  # os.chdir(config[src_path_windows])
+  # destructive_fetch_experimental_branch(config)
+  # # Run the configure script.
+  # os.chdir(os.path.join(third_party_libxml_src, 'win32'))
+  # subprocess.check_call([
+  #   'cscript', '//E:jscript', 'configure.js', 'compiler=msvc', 'iconv=no',
+  #   'icu=yes', 'ftp=no', 'http=no'
+  # ])
 
   # Add, commit and push the result.
-  shutil.move('VC10/config.h', '../../win32')
+  shutil.move('VC10/config.h', '../../win32/config.h')
   git('add', '../../win32/config.h')
-  shutil.move('include/libxml/xmlversion.h', '../../win32')
+  shutil.move('include/libxml/xmlversion.h', '../../win32/xmlversion.h')
   git('add', '../../win32/xmlversion.h')
   git('commit', '-m', 'Windows')
   git('push', 'wip', 'HEAD:%s' % config[wip_ref])
