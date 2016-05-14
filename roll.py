@@ -192,6 +192,12 @@ def roll_libxslt_linux_2(config):
   git('cl', 'upload', '-t', commit_message, '-m', commit_message)
   git('cl', 'try')
 
+def destructive_fetch_experimental_branch(config):
+  # Fetch the in-progress roll from the experimental branch.
+  git('fetch', 'wip', config[wip_ref])
+  git('reset', '--hard', 'FETCH_HEAD')
+  git('clean', '-f')
+
 def roll_libxslt_windows(config):
   os.chdir(config[src_path_windows])
   destructive_fetch_experimental_branch(config)
