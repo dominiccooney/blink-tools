@@ -21,13 +21,17 @@ import subprocess
 # -- Update config below to explain where everything is.
 # - On OS X, install these MacPorts:
 #   autoconf automake libtool pkgconfig
+# - On Linux:
+#   sudo apt-get install libicu-dev
+#   TODO(dominicc): Investigate making this use Chrome's ICU
 #
 # Procedure:
 #
-# 1. On Linux, run roll.lgo()
-# 2. On Windows, run roll.wgo()
-# 3. On OS X, run roll.ogo()
-# 4. On Linux, run roll.lgo2()
+# For X = xml, xslt
+# 1. On Linux, run roll.X_lgo()
+# 2. On Windows, run roll.X_wgo()
+# 3. On OS X, run roll.X_ogo()
+# 4. On Linux, run roll.X_lgo2()
 # 5. Check the try jobs pass (git cl try-results).
 # 6. Update the README.chromium file with notes.
 # 7. Complete code review, commit queue, etc. as normal.
