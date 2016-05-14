@@ -79,11 +79,6 @@ def sed_in_place(input_filename, program):
   # OS X's sed requires -e
   subprocess.check_call(['sed', '-i', '-e', program, input_filename])
 
-def destructive_fetch_experimental_branch(config):
-  # Fetch the in-progress roll from the experimental branch.
-  git('fetch', 'wip', config[wip_ref])
-  git('reset', '--hard', 'FETCH_HEAD')
-
 def get_out_of_jail(config, which):
   os.chdir(config[which])
   git('reset', '--hard', 'origin/master')
