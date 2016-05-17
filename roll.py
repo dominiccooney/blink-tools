@@ -246,11 +246,21 @@ def cherry_pick_patch(commit, filename):
              {'commit': commit, 'filename': filename})
   subprocess.check_call(command, shell=True)
 
+def check_copying(full_path_to_third_party_libxml_src):
+  path = os.path.join(full_path_to_third_party_libxml_src, 'COPYING')
+  if not os.path.exists(path):
+    return
+  with open(path) as f:
+    s = f.read()
+    if 'GNU' in s:
+      raise Exception('check COPYING')
+
 def roll_libxml_linux(config):
   # Need to snarf this file path before changing dirs
   # TODO(dominicc): This is no longer necessary in Python 3.4.1?
   patch_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             'roll-cr599427.txt')
+  print patch_file
 
   os.chdir(config[src_path_linux])
 
@@ -261,6 +271,7 @@ def roll_libxml_linux(config):
                                                      third_party_libxml_src)
   commit = export_to_chromium_chdir(config[libxml_path],
                                     full_path_to_third_party_libxml_src)
+  check_copying(full_path_to_third_party_libxml_src)
   # Put the version number is the README file
   sed_in_place('../README.chromium', 's/Version: .*$/Version: %s/' % commit)
 
@@ -275,6 +286,7 @@ def roll_libxml_linux(config):
 
   os.chdir('../linux')
   subprocess.check_call(['../src/autogen.sh'] + xml_configure_options)
+  check_copying(full_path_to_third_party_libxml_src)
   sed_in_place('config.h', 's/#define HAVE_RAND_R 1//')
 
   # Add *everything* and push it to the cloud for configuring on OS X, Windows
