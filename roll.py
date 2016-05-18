@@ -65,7 +65,7 @@ config = {
   libxslt_path: '/usr/local/google/work/xml/libxslt',
 
   # Where you store Chromium source, up to and including src
-  src_path_linux: '/usr/local/google/work/cb/src',
+  src_path_linux: '/tc/cb/src',
   src_path_osx: '/Users/dpc/ca/src',
   src_path_windows: r'C:\src\ca\src',
 
@@ -269,8 +269,11 @@ def roll_libxml_linux(config):
   # Update the libxml repo and export it to the Chromium tree
   full_path_to_third_party_libxml_src = os.path.join(config[src_path_linux],
                                                      third_party_libxml_src)
-  commit = export_to_chromium_chdir(config[libxml_path],
-                                    full_path_to_third_party_libxml_src)
+  os.chdir(full_path_to_third_party_libxml_src)
+  subprocess.check_call('tar xzf ~/Downloads/libxml2-2.9.4-rc2.tar.gz --strip-components=1', shell=True)
+  commit = '2.9.4-rc2'
+#  commit = export_to_chromium_chdir(config[libxml_path],
+#                                    full_path_to_third_party_libxml_src)
   check_copying(full_path_to_third_party_libxml_src)
   # Put the version number is the README file
   sed_in_place('../README.chromium', 's/Version: .*$/Version: %s/' % commit)
