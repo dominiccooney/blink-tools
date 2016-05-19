@@ -331,6 +331,7 @@ def roll_libxml_linux_2(config):
     'src/example',
     'src/genChRanges.py',
     'src/global.data',
+    'src/include/libxml/xmlversion.h',
     'src/include/libxml/xmlwin32version.h',
     'src/include/libxml/xmlwin32version.h.in',
     'src/libxml2.doap',
