@@ -21,7 +21,7 @@ import tempfile
 # -- Clone git://git.gnome.org/libxslt somewhere.
 # -- Update config below to explain where everything is.
 # - On OS X, install these MacPorts:
-#   autoconf automake libtool pkgconfig
+#   autoconf automake libtool pkgconfig icu
 # - On Linux:
 #   sudo apt-get install libicu-dev
 #   TODO(dominicc): Investigate making this use Chrome's ICU
@@ -275,7 +275,7 @@ def prepare_libxml_distribution_chdir(config, temp_dir):
       '''awk '/PACKAGE =/ {p=$3} /VERSION =/ {v=$3} '''
       '''END {printf("%s-%s.tar.gz", p, v)}' Makefile''',
       shell=True)
-  return commit, tar_file
+  return commit, os.path.abspath(tar_file)
 
 # TODO(dominicc): Add a directory pushing-popping abstraction.
 
@@ -294,7 +294,13 @@ def roll_libxml_linux(config):
     commit, tar_file = prepare_libxml_distribution_chdir(config, temp_dir)
 
     os.chdir(config[src_path_linux])
-    git('checkout', '-b', 'roll-libxml-%s' % commit, 'origin/master')
+    branch_name = 'roll-libxml-%s' % commit
+    # TODO(dominicc): This is messy; at least check for word boundaries
+    if branch_name in subprocess.check_output(['git', 'branch']):
+      git('checkout', branch_name)
+      git('reset', '--hard', 'origin/master')
+    else:
+      git('checkout', '-b', branch_name, 'origin/master')
 
     # Nuke the old libxml from orbit; this ensures only desired cruft
     # accumulates
