@@ -4,6 +4,7 @@ import os
 import shutil
 import stat
 import subprocess
+import tempfile
 
 # Warning: This process is destructive and just gives up on
 # failure. Some amount of examining line numbers on failure is
@@ -255,6 +256,29 @@ def check_copying(full_path_to_third_party_libxml_src):
     if 'GNU' in s:
       raise Exception('check COPYING')
 
+def prepare_libxml_distribution_chdir(config, temp_dir):
+  '''Returns a tuple of commit hash and full path to archive.'''
+  # Could push from a distribution prepared upstream instead by
+  # returning the version string and a distribution tar file.
+  temp_config_path = os.path.join(temp_dir, 'config')
+  os.mkdir(temp_config_path)
+  temp_src_path = os.path.join(temp_dir, 'src')
+  os.mkdir(temp_src_path)
+
+  commit = export_to_chromium_chdir(config[libxml_path], temp_src_path)
+  os.chdir(temp_config_path)
+  subprocess.check_call(['../src/autogen.sh'] + xml_configure_options)
+  subprocess.check_call(['make', 'dist-all'])
+
+  # Work out what it is called
+  tar_file = subprocess.check_output(
+      '''awk '/PACKAGE =/ {p=$3} /VERSION =/ {v=$3} '''
+      '''END {printf("%s-%s.tar.gz", p, v)}' Makefile''',
+      shell=True)
+  return commit, tar_file
+
+# TODO(dominicc): Add a directory pushing-popping abstraction.
+
 def roll_libxml_linux(config):
   # Need to snarf this file path before changing dirs
   # TODO(dominicc): This is no longer necessary in Python 3.4.1?
@@ -262,23 +286,31 @@ def roll_libxml_linux(config):
                             'roll-cr599427.txt')
   print patch_file
 
-  os.chdir(config[src_path_linux])
+  # Begin pushing from git repo
+  try:
+    temp_dir = tempfile.mkdtemp()
+    print 'temporary directory: %s' % temp_dir
 
-  identifier = subprocess.check_output('git branch | grep roll-libxml | wc -l',
-                                       shell=True)
-  git('checkout', '-b', 'roll-libxml-%s' % identifier, 'origin/master')
+    commit, tar_file = prepare_libxml_distribution_chdir(config, temp_dir)
 
-  # Nuke the old libxml from orbit; this ensures only desired cruft accumulates
-  nuke_preserving(third_party_libxml_src, [])
-  # Update the libxml repo and export it to the Chromium tree
-  full_path_to_third_party_libxml_src = os.path.join(config[src_path_linux],
-                                                     third_party_libxml_src)
-  os.chdir(full_path_to_third_party_libxml_src)
-  subprocess.check_call('tar xzf ~/Downloads/libxml2-2.9.4-rc2.tar.gz --strip-components=1', shell=True)
-  commit = '2.9.4-rc2'
-#  commit = export_to_chromium_chdir(config[libxml_path],
-#                                    full_path_to_third_party_libxml_src)
-  check_copying(full_path_to_third_party_libxml_src)
+    os.chdir(config[src_path_linux])
+    git('checkout', '-b', 'roll-libxml-%s' % commit, 'origin/master')
+
+    # Nuke the old libxml from orbit; this ensures only desired cruft
+    # accumulates
+    nuke_preserving(third_party_libxml_src, [])
+
+    # Update the libxml repo and export it to the Chromium tree
+    full_path_to_third_party_libxml_src = os.path.join(config[src_path_linux],
+                                                       third_party_libxml_src)
+    os.chdir(full_path_to_third_party_libxml_src)
+
+    subprocess.check_call(
+        'tar xzf %s --strip-components=1' % tar_file,
+        shell=True)
+  finally:
+    shutil.rmtree(temp_dir)
+
   # Put the version number is the README file
   sed_in_place('../README.chromium', 's/Version: .*$/Version: %s/' % commit)
 
@@ -300,6 +332,7 @@ def roll_libxml_linux(config):
   os.chdir('../src')
   git('add', '*')
   git('commit', '-am', '%s libxml, linux' % commit)
+  check_copying(full_path_to_third_party_libxml_src)
   git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
 
   print('Now run steps on Windows, then OS X, then back here.')
