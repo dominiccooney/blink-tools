@@ -348,6 +348,7 @@ def roll_libxml_linux_2(config):
     'src/vms',
     'src/win32/VC10/config.h',
     'src/win32/wince',
+    'src/xml2-config.in',
     'src/xmlcatalog.c',
     'src/xmllint.c',
     'src/xstc',
