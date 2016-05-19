@@ -65,7 +65,7 @@ config = {
   libxslt_path: '/usr/local/google/work/xml/libxslt',
 
   # Where you store Chromium source, up to and including src
-  src_path_linux: '/tc/cb/src',
+  src_path_linux: '/usr/local/google/work/cb/src',
   src_path_osx: '/Users/dpc/ca/src',
   src_path_windows: r'C:\src\ca\src',
 
@@ -190,7 +190,7 @@ def roll_libxslt_linux_2(config):
     'examples',
     'vms'
   ]
-  git('rm', '-rf', *files_to_remove)
+  remove_tracked_files(files_to_remove)
   git('commit', '-m', 'Remove unused files.')
   commit_message = 'Roll libxslt to %s' % commit
   git('cl', 'upload', '-t', commit_message, '-m', commit_message)
@@ -264,6 +264,10 @@ def roll_libxml_linux(config):
 
   os.chdir(config[src_path_linux])
 
+  identifier = subprocess.check_output('git branch | grep roll-libxml | wc -l',
+                                       shell=True)
+  git('checkout', '-b', 'roll-libxml-%s' % identifier, 'origin/master')
+
   # Nuke the old libxml from orbit; this ensures only desired cruft accumulates
   nuke_preserving(third_party_libxml_src, [])
   # Update the libxml repo and export it to the Chromium tree
@@ -299,6 +303,10 @@ def roll_libxml_linux(config):
   git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
 
   print('Now run steps on Windows, then OS X, then back here.')
+
+def remove_tracked_files(files_to_remove):
+  files_to_remove = [f for f in files_to_remove if os.path.exists(f)]
+  git('rm', '-rf', *files_to_remove)
 
 # This continues the roll on Linux after Windows and OS X are done.
 def roll_libxml_linux_2(config):
@@ -343,7 +351,7 @@ def roll_libxml_linux_2(config):
     'src/xmllint.c',
     'src/xstc',
   ]
-  git('rm', '-rf', *files_to_remove)
+  remove_tracked_files(files_to_remove)
   git('commit', '-m', 'Remove unused files.')
   commit_message = 'Roll libxml to %s' % commit
   git('cl', 'upload', '-t', commit_message, '-m', commit_message)
