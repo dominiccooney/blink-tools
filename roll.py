@@ -322,8 +322,6 @@ def roll_libxml_linux(config):
 
   # printf format specifiers
   cherry_pick_patch('d31995076e55f1aac2f935c53b585a90ece27a11', 'timsort.h')
-  # crbug.com/595262
-  cherry_pick_patch('27a27edb43e42023db7d154dcd9f66a500296cc1', 'parser.c')
   # crbug.com/599427
   subprocess.check_call(['patch', 'xmlstring.c', patch_file])
   # crbug.com/602280
