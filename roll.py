@@ -84,6 +84,8 @@ class WorkingDir(object):
     os.chdir(self.path)
 
   def __exit__(self, exc_type, exc_value, traceback):
+    if exc_value:
+      print('was in %s; %s before that' % (self.path, self.prev_path))
     os.chdir(self.prev_path)
 
 def git(*args):
@@ -290,16 +292,19 @@ def roll_libxml_linux(config):
   # TODO(dominicc): This is no longer necessary in Python 3.4.1?
   patch_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             'roll-cr599427.txt')
-  print patch_file
+  print(patch_file)
 
-  # Begin pushing from git repo
-  try:
-    temp_dir = tempfile.mkdtemp()
-    print 'temporary directory: %s' % temp_dir
+  full_path_to_third_party_libxml_src = os.path.join(config[src_path_linux],
+                                                     third_party_libxml_src)
 
-    commit, tar_file = prepare_libxml_distribution(config, temp_dir)
+  with WorkingDir(config[src_path_linux]):
+    # Begin pushing from git repo
+    try:
+      temp_dir = tempfile.mkdtemp()
+      print('temporary directory: %s' % temp_dir)
 
-    with WorkingDir(config[src_path_linux]):
+      commit, tar_file = prepare_libxml_distribution(config, temp_dir)
+
       branch_name = 'roll-libxml-%s' % commit
       # TODO(dominicc): This is messy; at least check for word boundaries
       if branch_name in subprocess.check_output(['git', 'branch']):
@@ -317,32 +322,32 @@ def roll_libxml_linux(config):
         subprocess.check_call(
             'tar xzf %s --strip-components=1' % tar_file,
             shell=True)
-  finally:
-    shutil.rmtree(temp_dir)
+    finally:
+      shutil.rmtree(temp_dir)
 
-  # Put the version number is the README file
-  sed_in_place('../README.chromium', 's/Version: .*$/Version: %s/' % commit)
+    with WorkingDir(third_party_libxml_src):
+      # Put the version number is the README file
+      sed_in_place('../README.chromium', 's/Version: .*$/Version: %s/' % commit)
 
-  # printf format specifiers
-  cherry_pick_patch('d31995076e55f1aac2f935c53b585a90ece27a11', 'timsort.h')
-  # crbug.com/599427
-  subprocess.check_call(['patch', 'xmlstring.c', patch_file])
-  # crbug.com/602280
-  cherry_pick_patch('bc5dfe3dbb61e497438849dbe909520128f5bbac', 'uri.c')
+      # printf format specifiers
+      cherry_pick_patch('d31995076e55f1aac2f935c53b585a90ece27a11', 'timsort.h')
+      # crbug.com/599427
+      subprocess.check_call(['patch', 'xmlstring.c', patch_file])
 
-  with WorkingDir('../linux'):
-    subprocess.check_call(['../src/autogen.sh'] + xml_configure_options)
-    check_copying(full_path_to_third_party_libxml_src)
-    sed_in_place('config.h', 's/#define HAVE_RAND_R 1//')
+      with WorkingDir('../linux'):
+        subprocess.check_call(['../src/autogen.sh'] + xml_configure_options)
+        check_copying(full_path_to_third_party_libxml_src)
+        sed_in_place('config.h', 's/#define HAVE_RAND_R 1//')
 
-  # Add *everything* and push it to the cloud for configuring on OS X, Windows
-  with WorkingDir('../src'):
-    git('add', '*')
-    git('commit', '-am', '%s libxml, linux' % commit)
-    check_copying(full_path_to_third_party_libxml_src)
-    git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
+      # Add *everything* and push it to the cloud for configuring on OS
+      # X, Windows
+      with WorkingDir('../src'):
+        git('add', '*')
+        git('commit', '-am', '%s libxml, linux' % commit)
+        check_copying(full_path_to_third_party_libxml_src)
+        git('push', '-f', 'wip', 'HEAD:%s' % config[wip_ref])
 
-    print('Now run steps on Windows, then OS X, then back here.')
+  print('Now run steps on Windows, then OS X, then back here.')
 
 def remove_tracked_files(files_to_remove):
   files_to_remove = [f for f in files_to_remove if os.path.exists(f)]
