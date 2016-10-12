@@ -13,7 +13,9 @@ import tempfile
 # Prerequisites:
 #
 # - Check out Chromium somewhere on Linux, OS X and Windows.
-# - Add the experimental remote named 'wip'.
+# - Add the experimental remote named 'wip':
+#   git remote add -f wip \
+#   https://chromium.googlesource.com/experimental/chromium/src
 # - XML
 # -- Clone git://git.gnome.org/libxml2
 # -- Update config below to explain where everything is.
@@ -66,8 +68,8 @@ config = {
   libxslt_path: '/usr/local/google/work/xml/libxslt',
 
   # Where you store Chromium source, up to and including src
-  src_path_linux: '/usr/local/google/work/cb/src',
-  src_path_osx: '/Users/dpc/ca/src',
+  src_path_linux: '/usr/local/google/work/ca/src',
+  src_path_osx: '/Users/dominicc/ca/src',
   src_path_windows: r'C:\src\ca\src',
 
   # The ref of the Experimental Branch to push intermediate steps to,
@@ -148,6 +150,7 @@ def roll_libxslt_linux(config):
       subprocess.check_call(['../autogen.sh'] + xslt_configure_options +
                             ['--with-libxml-src=../../libxml/linux/'])
       sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
+      sed_in_place('config.log', 's/[a-z.0-9]+\.corp\.google\.com/REDACTED/')
 
       # Other platforms share this, even though it is generated on Linux.
       # Android and Windows do not have xlocale.
@@ -252,9 +255,12 @@ def roll_libxslt_osx(config):
 
 # Does something like cherry-pick, but against edited files.
 def cherry_pick_patch(commit, filename):
+  print('cherry picking from %s: %s' % (commit, filename))
   command = (r"""git format-patch -1 --stdout %(commit)s | """
-             r"""awk '/---.*\/%(filename)s/,/--$/ {print}' | patch""" %
+             r"""awk '/---.*\/%(filename)s/,/(--$|diff --git)/ {print}' | """
+             r"""patch""" %
              {'commit': commit, 'filename': filename})
+  print command
   subprocess.check_call(command, shell=True)
 
 def check_copying(full_path_to_third_party_libxml_src):
@@ -333,6 +339,12 @@ def roll_libxml_linux(config):
       cherry_pick_patch('d31995076e55f1aac2f935c53b585a90ece27a11', 'timsort.h')
       # crbug.com/599427
       subprocess.check_call(['patch', 'xmlstring.c', patch_file])
+      # crbug.com/623378
+      for f in ['xpath.c', 'xpointer.c']:
+        cherry_pick_patch('b6ad54b72c7f8c422c288dd9c8756d2a15f30e53', f)
+      # crbug.com/624011
+      cherry_pick_patch('6eee7eee18990d52a5e0723058f0e4d186e1e278',
+                        'xpointer.c')
 
       with WorkingDir('../linux'):
         subprocess.check_call(['../src/autogen.sh'] + xml_configure_options)
