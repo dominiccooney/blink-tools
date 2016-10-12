@@ -128,7 +128,7 @@ def export_to_chromium(remote_repo_path, full_third_party_path):
 
 def roll_libxslt_linux(config):
   with WorkingDir(config[src_path_linux]):
-    files_to_preserve = ['OWNERS', 'README.chromium', 'BUILD.gn', 'libxslt.gyp']
+    files_to_preserve = ['OWNERS', 'README.chromium', 'BUILD.gn']
     nuke_preserving(third_party_libxslt, files_to_preserve)
 
     # Update the libxslt repo and export it to the Chromium tree
@@ -144,6 +144,9 @@ def roll_libxslt_linux(config):
     # Ad-hoc patch for Windows
     sed_in_place('libxslt/security.c',
                  r's/GetFileAttributes\b/GetFileAttributesA/g')
+
+    with WorkingDir('libxslt'):
+      cherry_pick_patch('f878ab7a662f23f54d8a978366d6e8d4b2455d23', 'numbers.c')
 
     os.mkdir('linux')
     with WorkingDir('linux'):
