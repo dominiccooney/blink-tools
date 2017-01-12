@@ -48,7 +48,7 @@
   (if (and (string-match "WebKit" (buffer-file-name)))
       (progn
        (set-variable 'indent-tabs-mode nil)
-       (set-variable 'c-basic-offset 4))))
+       (set-variable 'c-basic-offset 2))))
 
 (defun bk-html-mode-hook ()
   (bk-layout-test-hook))
