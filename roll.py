@@ -145,14 +145,17 @@ def roll_libxslt_linux(config):
     sed_in_place('libxslt/security.c',
                  r's/GetFileAttributes\b/GetFileAttributesA/g')
 
-    with WorkingDir('libxslt'):
-      cherry_pick_patch('f878ab7a662f23f54d8a978366d6e8d4b2455d23', 'numbers.c')
-
     os.mkdir('linux')
     with WorkingDir('linux'):
       subprocess.check_call(['../autogen.sh'] + xslt_configure_options +
                             ['--with-libxml-src=../../libxml/linux/'])
       sed_in_place('config.h', 's/#define HAVE_CLOCK_GETTIME 1//')
+
+      # https://crbug.com/670720
+      sed_in_place('config.h', 's/#define HAVE_ASCTIME 1//')
+      sed_in_place('config.h', 's/#define HAVE_LOCALTIME 1//')
+      sed_in_place('config.h', 's/#define HAVE_MKTIME 1//')
+
       sed_in_place('config.log', 's/[a-z.0-9]+\.corp\.google\.com/REDACTED/')
 
       # Other platforms share this, even though it is generated on Linux.
