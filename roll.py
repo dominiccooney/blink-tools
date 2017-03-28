@@ -156,7 +156,7 @@ def roll_libxslt_linux(config):
       sed_in_place('config.h', 's/#define HAVE_LOCALTIME 1//')
       sed_in_place('config.h', 's/#define HAVE_MKTIME 1//')
 
-      sed_in_place('config.log', 's/[a-z.0-9]+\.corp\.google\.com/REDACTED/')
+      sed_in_place('config.log', 's/[a-z.0-9]\+\.corp\.google\.com/REDACTED/')
 
       # Other platforms share this, even though it is generated on Linux.
       # Android and Windows do not have xlocale.
