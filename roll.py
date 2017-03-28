@@ -261,10 +261,12 @@ def roll_libxslt_osx(config):
 
 # Does something like cherry-pick, but against edited files.
 def cherry_pick_patch(commit, filename):
+  # TODO(dominicc): -p4 is hard coded for a/third_party/libxml/src => 4 components
   print('cherry picking from %s: %s' % (commit, filename))
+  filename = filename.replace('/', r'\/')
   command = (r"""git format-patch -1 --stdout %(commit)s | """
              r"""awk '/---.*\/%(filename)s/,/(--$|diff --git)/ {print}' | """
-             r"""patch""" %
+             r"""patch -p4""" %
              {'commit': commit, 'filename': filename})
   print command
   subprocess.check_call(command, shell=True)
