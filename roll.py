@@ -48,7 +48,7 @@ third_party_libxml_src = 'third_party/libxml/src'
 third_party_libxslt = 'third_party/libxslt'
 
 xml_configure_options = ['--without-iconv', '--with-icu', '--without-ftp',
-                         '--without-http', '--without-lzma']
+                         '--without-http', '--without-lzma', '--without-valid']
 xslt_configure_options = ['--without-debug', '--without-mem-debug',
                           '--without-debugger', '--without-plugins']
 
@@ -302,10 +302,9 @@ def prepare_libxml_distribution(config, temp_dir):
 def roll_libxml_linux(config):
   # Need to snarf this file path before changing dirs
   # TODO(dominicc): This is no longer necessary in Python 3.4.1?
-  patch_file = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                            'roll-cr599427.txt')
-  print(patch_file)
-
+  patch_files = ['roll-cr599427.txt']
+  patch_files = map(lambda f: os.path.join(os.path.dirname(os.path.abspath(__file__)), f),
+                    patch_files)
   full_path_to_third_party_libxml_src = os.path.join(config[src_path_linux],
                                                      third_party_libxml_src)
 
@@ -341,16 +340,15 @@ def roll_libxml_linux(config):
       # Put the version number is the README file
       sed_in_place('../README.chromium', 's/Version: .*$/Version: %s/' % commit)
 
-      # printf format specifiers
-      cherry_pick_patch('d31995076e55f1aac2f935c53b585a90ece27a11', 'timsort.h')
       # crbug.com/599427
-      subprocess.check_call(['patch', 'xmlstring.c', patch_file])
-      # crbug.com/623378
-      for f in ['xpath.c', 'xpointer.c']:
-        cherry_pick_patch('b6ad54b72c7f8c422c288dd9c8756d2a15f30e53', f)
-      # crbug.com/624011
-      cherry_pick_patch('6eee7eee18990d52a5e0723058f0e4d186e1e278',
-                        'xpointer.c')
+      subprocess.check_call(['patch', 'xmlstring.c', patch_files[0]])
+      # crbug.com/628581
+      for f in ['entities.c', 'include/libxml/entities.h', 'parser.c']:
+        cherry_pick_patch('acca03bd98815a12daf812471f649041f5381571', f)
+      # crbug.com/620679
+      cherry_pick_patch('6b6cc2b4809e9e7479b03e69b39f613f2de70e0b', 'parser.c')
+      # https://codereview.chromium.org/2657773002
+      cherry_pick_patch('b4054e8b83b60019c8cdcc9e9025fc6138725cf4', 'parser.c')
 
       with WorkingDir('../linux'):
         subprocess.check_call(['../src/autogen.sh'] + xml_configure_options)
@@ -429,7 +427,7 @@ def roll_libxml_windows(config):
     with WorkingDir(os.path.join(third_party_libxml_src, 'win32')):
       subprocess.check_call([
         'cscript', '//E:jscript', 'configure.js', 'compiler=msvc', 'iconv=no',
-        'icu=yes', 'ftp=no', 'http=no'
+        'icu=yes', 'ftp=no', 'http=no', 'valid=no'
       ])
 
       # Add, commit and push the result.
