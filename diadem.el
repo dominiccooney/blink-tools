@@ -1,8 +1,13 @@
 ; Copyright 2010 Dominic Cooney. All Rights Reserved.
 
-; Writing tools. Use DD-REVISE-PARAGRAPH to start. Diadem uses
-; functions in paragraph.el heavily, so consider customizing variables
-; like SENTENCE-END-DOUBLE-SPACE and so on.
+; Writing tools. Use one of the following to start:
+; - DD-SPJ-WRITE-A-GREAT-PAPER to review Simon Peyton Jones' advice.
+; - DD-TPP-BUILD-PYRAMID to interactively build a structured argument.
+; - DD-REVISE-PARAGRAPH to edit a paragraph for coherence and flow.
+; - DD-REVISE-BY-RULES to edit at a word level for common malapropisms.
+;
+; Diadem uses functions in paragraph.el heavily, so consider
+; customizing variables like SENTENCE-END-DOUBLE-SPACE and so on.
 
 ;; TODO:
 ;; - Add a way to iterate by paragraph, by sentence, by bigram, etc.
@@ -243,7 +248,110 @@ noun\"?) Can you find anything more specifically the same about
 them? Can you justify their order on that basis? Are there any
 missing?\n\n"
    (dd-prompt-paragraph (dd-tpp-cite 91))))
-   
+
+(defun dd-spj-write-a-great-paper (&optional button)
+  "Simon Peyton Jones' \"How to write a great research paper\"."
+  (interactive)
+  (dd-new-session)
+  (dd-prompt
+   (make-dd-prompt-button :text "Done" :action #'dd-done)
+   "\n\n"
+   "Seven suggestions by Simon Peyton Jones, from
+   https://www.microsoft.com/en-us/research/academic-program/write-great-research-paper/
+
+1. Write first.
+
+2. Identify your key idea. Your goal is to convey a useful and
+   re-usable idea. You want to infect the mind of your reader
+   with your idea, like a virus.
+
+   Write a paper, and give a talk, about any idea, no matter how
+   weedy and insignificant it may seem to you. It usually turns
+   out to be more interesting and challenging than it seemed at
+   first.
+
+   The paper should have just one \"ping\": one clear, sharp
+   idea. You may not know what it is when you start writing; but
+   you must know when you finish.
+
+   If you have lots of ideas, write lots of papers.
+
+   Be 100% specific: \"The main idea of this paper is ...\"
+
+3. Tell a story. Imagine you're at a whiteboard:
+   - Here is a problem.
+   - It's an interesting problem.
+   - It's an unsolved problem.
+   - Here's my idea.
+   - My idea works (details, data).
+   - Here's how my idea compares to other people's approaches.
+
+   Example structure (conference paper):
+   - Title (1000 readers)
+   - Abstract (4 sentences, 100 readers)
+   - Introduction (1 page, 100 readers)
+   - The problem (1 page, 10 readers)
+   - My idea (2 pages, 10 readers)
+   - The details (5 pages, 3 readers)
+   - Related work (1-2 pages, 10 readers)
+   - Conclusions and further work (0.5 pages)
+
+4. Nail your contributions to the mast: The introduction should
+   describe the problem and state your contributions--and that is
+   all--in one page.
+
+   Use an example to introduce the problem. \"Molehills not
+   mountains.\"
+
+   Write the list of contributions first; this drives the entire
+   paper, which substantiates the claims you have made. The
+   reader thinks \"gosh, if they can really deliver this, that'd
+   be exciting; I'd better read on.\"
+
+   Use a bulleted list.
+
+   Contributions should be refutable.
+
+   The body of the paper should provide evidence to support each
+   claim in the contributions. Check each claim, identify the
+   evidence, and forward-reference it from the claim, thus
+   avoiding the \"the rest of this paper is structured as
+   follows. Section 2 ...\" \"Evidence\" can be analysis and
+   comparison, theorems, measurements, case studies.
+
+5. Put related work later, before conclusions. Don't put another
+   barrier between the reader and your idea. This also avoids the
+   #include jargon problem which makes ideas inaccessible to
+   beginners.
+
+   Be generous with credit: Warmly acknowledge people who have
+   helped; be generous to the competition; acknowledge weaknesses
+   in your approach.
+
+6. Put your readers first.
+
+   Structure, this the \"the problem/my idea/the details\" part.
+
+   Present the idea as if you were explaining the problem to
+   someone using a whiteboard. Conveying the intuition is
+   primary. Once the reader has the intuition she can follow the
+   details, but not vice versa; even if she skips the details she
+   can take away something valuable.
+
+   Convey intuition using examples and only then present the
+   general case. (\"Is there any typewriter font?\")
+
+   Do not recapitulate your personal journey of discovery; it is
+   not interesting to the reader.
+
+7. Listen to your readers: Solicit feedback from experts and
+   non-experts, including competitors. (\"Could you help me
+   ensure that I describe your work fairly?\")
+
+   Be grateful for reviews, especially criticism. Read every
+   criticism as a positive suggestion for something you could
+   explain more clearly. Thank them warmly; do not respond to the
+   criticism but fix the paper so that it is obvious."))
 
 ;; Things from "Technical Writing and Professional Communication."
 
