@@ -190,7 +190,7 @@ class Summarizer(object):
     if not path:
       # This is a compromise between utility and output size. Chrome can't
       # render ginormous treemaps.
-      path = symbol[0:10] + '...'
+      path = '???/' + symbol[0:15] + '...'
     # Pass symbol here to get symbol-level breakdowns.
     # This drastically increases the size of the output file.
     entry = Entry(size, path, None)
