@@ -1,0 +1,54 @@
+body {
+  border: 1px solid orange;
+  width: 99vw;
+  height: 99vh;
+  margin: 0;
+}
+
+#logLinesView {
+  margin-top: 2em;
+  font-family: monospace;
+}
+
+#toolbar {
+  top: 0;
+  left: 0;
+  right: 0;
+  position: fixed;
+  background: purple;
+  z-index: 1;
+}
+
+#search.invalid {
+  background-color: pink;
+}
+
+.logLine {
+  position: relative;
+}
+
+.logLine.hide {
+  display: none;
+}
+
+.logLine:not(.valid) {
+  color: maroon;
+}
+
+.logLine > .delta {
+  display: none;
+  position: absolute;
+  text-align: right;
+  width: 10em;
+  padding-right: 1em;
+}
+
+.logLine > .delta.show {
+  display: inline-block;
+  background: green;
+  color: white;
+}
+
+.logLine > .delta.neg {
+  background: maroon;
+}
